@@ -1,3 +1,5 @@
+﻿using System.Text.Json.Serialization;
+
 namespace Kurogane.Core;
 
 /// <summary>
@@ -24,6 +26,17 @@ public sealed class ChangeRecord
 
     public string NewValueKind { get; set; } = "";
     public string NewValue { get; set; } = "";
+
+    /// <summary>
+    /// true quand la valeur en place est déjà exactement celle qu'on écrirait.
+    /// Une telle modification n'est pas appliquée : elle n'apporterait rien au
+    /// rendu et encombrerait le point de restauration d'entrées sans objet.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsNoOp =>
+        Existed
+        && string.Equals(OriginalValueKind, NewValueKind, StringComparison.Ordinal)
+        && string.Equals(OriginalValue, NewValue, StringComparison.Ordinal);
 
     /// <summary>Rendu lisible pour le plan et le journal.</summary>
     public string Render()

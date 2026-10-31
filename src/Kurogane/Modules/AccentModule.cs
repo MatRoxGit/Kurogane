@@ -1,4 +1,4 @@
-using Kurogane.Core;
+﻿using Kurogane.Core;
 using Kurogane.Native;
 using Kurogane.Theme;
 using Microsoft.Win32;
@@ -50,16 +50,23 @@ public sealed class AccentModule : IThemeModule
 
         // --- Explorer : nuancier du shell ---
 
-        byte[] palette = ColorUtil.BuildAccentPalette(rgb);
+        // La valeur en place est relue pour préserver son index 7, dont
+        // l'usage nous échappe (voir ColorUtil). Lecture seule : Plan() reste
+        // sans effet de bord.
+        byte[] palette = ColorUtil.BuildAccentPalette(rgb, ReadCurrentPalette());
 
         yield return Accent("AccentPalette", RegistryValueKind.Binary, palette,
-            "Nuancier d'accent (8 teintes)");
+            $"Nuancier d'accent (accent au rang {ColorUtil.AccentIndex}, index 7 préservé)");
 
         yield return Accent("AccentColorMenu", RegistryValueKind.DWord, abgr,
             "Accent des menus");
 
-        yield return Accent("StartColorMenu", RegistryValueKind.DWord, abgr,
-            "Accent du menu Démarrer");
+        // Le menu Démarrer n'utilise pas l'accent brut mais la nuance du rang
+        // juste en dessous — constaté sur deux installations de Windows 11.
+        var startShade = ColorUtil.PaletteShade(rgb, ColorUtil.StartMenuIndex);
+
+        yield return Accent("StartColorMenu", RegistryValueKind.DWord, ColorUtil.ToAbgr(startShade),
+            $"Accent du menu Démarrer {startShade} (nuance {ColorUtil.StartMenuIndex})");
 
         // --- Personalize : barre des tâches et Démarrer ---
 
@@ -78,6 +85,17 @@ public sealed class AccentModule : IThemeModule
         journal.Ok("Couleurs rediffusées au shell");
         journal.Info("Si la barre des tâches ne se recolore pas, un redémarrage "
                    + "d'explorer.exe suffit — il n'y a rien d'autre à refaire.");
+    }
+
+    /// <summary>
+    /// Lit le nuancier actuellement en place. Lecture seule, aucun effet de
+    /// bord. Retourne null si la valeur est absente ou d'un autre type.
+    /// </summary>
+    private static byte[]? ReadCurrentPalette()
+    {
+        using var baseKey = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Default);
+        using var key = baseKey.OpenSubKey(AccentKey, writable: false);
+        return key?.GetValue("AccentPalette") as byte[];
     }
 
     // --- fabriques ---

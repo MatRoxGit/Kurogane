@@ -1,5 +1,6 @@
-using Kurogane.Core;
+﻿using Kurogane.Core;
 using Kurogane.Modules;
+using Kurogane.Probe;
 using Kurogane.Theme;
 
 namespace Kurogane;
@@ -13,6 +14,8 @@ internal static class Program
         new DarkModeModule(),
         new AccentModule(),
         new WallpaperModule(),
+        new DesktopIconsModule(),
+        new ShellIconsModule(),
     };
 
     private static int Main(string[] args)
@@ -28,6 +31,7 @@ internal static class Program
                 "apply"    => CmdApply(args),
                 "restore"  => CmdRestore(args),
                 "list"     => CmdList(),
+                "probe-icons" => CmdProbe(args),
                 _          => Unknown(args[0]),
             };
         }
@@ -60,7 +64,7 @@ internal static class Program
         journal.Blank();
 
         // 1. Planification — aucune écriture.
-        var planned = new List<(IThemeModule Module, RegistryChange Change)>();
+        var planned = new List<PlanItem>();
         foreach (var m in Modules)
         {
             if (!m.AppliesTo(theme))
@@ -68,8 +72,18 @@ internal static class Program
                 journal.Info($"module {m.Name} : non concerné par ce thème");
                 continue;
             }
+
+            // Un module de niveau 2 écrit dans HKLM. Sans élévation il
+            // échouerait au milieu de l'application ; mieux vaut l'écarter
+            // dès la planification et le dire.
+            if (m.Level >= 2 && !Elevation.CanWriteHklm())
+            {
+                journal.Warn($"module {m.Name} : ignoré, droits administrateur requis");
+                continue;
+            }
+
             foreach (var c in m.Plan(theme))
-                planned.Add((m, c));
+                planned.Add(new PlanItem(m.Name, m.Level, c));
         }
 
         if (planned.Count == 0)
@@ -78,28 +92,114 @@ internal static class Program
             return 0;
         }
 
-        // 2. Capture de l'état d'origine — toujours, même en simulation.
-        journal.Blank();
-        journal.Step($"Plan : {planned.Count} modification(s)");
-        journal.Blank();
-
-        var records = new List<ChangeRecord>(planned.Count);
-        string? currentModule = null;
-
-        foreach (var (module, change) in planned)
+        return Execute(theme.Name, planned, commit, journal, j =>
         {
-            if (module.Name != currentModule)
+            foreach (var m in Modules.Where(m => m.AppliesTo(theme)))
             {
-                currentModule = module.Name;
-                journal.Info($"[{module.Name}] niveau {module.Level}");
+                try { m.PostApply(theme, j); }
+                catch (Exception ex) { j.Warn($"{m.Name} : {ex.Message}"); }
             }
+        });
+    }
 
-            var rec = change.Capture();
-            records.Add(rec);
+    // ---------------------------------------------------------- probe-icons
+
+    private static int CmdProbe(string[] args)
+    {
+        bool commit = Has(args, "--commit");
+
+        using var journal = new Journal(commit ? "probe-icons" : "probe-simulation");
+
+        journal.Step("Sonde de substitution d'icônes");
+
+        string icon = IconProbe.EnsureWitnessIcon();
+        journal.Info($"icône témoin : {icon}");
+        journal.Info("Magenta barré de blanc : aucune icône de Windows ne lui ressemble,");
+        journal.Info("donc aucun doute possible sur ce qui a été substitué.");
+
+        bool hklm = IconProbe.CanWriteHklm();
+        if (!hklm)
+        {
+            journal.Blank();
+            journal.Warn("Pas de droits administrateur : les cibles de niveau 2 sont ignorées");
+            journal.Warn("(dossiers, lecteurs, flèche de raccourci).");
+            journal.Warn("Relancer dans un terminal élevé pour les inclure.");
+        }
+
+        var planned = IconProbe.Targets(icon, hklm)
+                               .Select(t => new PlanItem(t.Group, t.Level, t.Change))
+                               .ToList();
+
+        if (planned.Count == 0)
+        {
+            journal.Warn("Aucune cible candidate.");
+            return 0;
+        }
+
+        return Execute("Sonde d'icônes", planned, commit, journal, j =>
+        {
+            Native.NativeMethods.RefreshShellIcons();
+            Native.NativeMethods.BroadcastThemeChange();
+            j.Ok("Cache d'icônes du shell invalidé");
+            j.Blank();
+            j.Info("Redémarre explorer.exe, puis regarde : Bureau, volet de navigation");
+            j.Info("de l'Explorateur, Ce PC, Corbeille (vide et pleine), un fichier .txt,");
+            j.Info("et la flèche sur un raccourci.");
+            j.Info("Tout ce qui N'EST PAS devenu magenta n'est pas substituable ici.");
+        });
+    }
+
+    // ------------------------------------------------------------- exécution
+
+    private sealed record PlanItem(string Group, int Level, RegistryChange Change);
+
+    /// <summary>
+    /// Chemin commun à toute commande qui écrit : capture de l'état d'origine,
+    /// écartement des valeurs déjà conformes, point de restauration posé AVANT
+    /// la première écriture, application avec retour arrière automatique.
+    ///
+    /// Aucune commande ne doit réimplémenter cette séquence — c'est elle qui
+    /// porte les garanties du projet, et une deuxième copie finirait par
+    /// diverger de celle-ci.
+    /// </summary>
+    private static int Execute(string planName, List<PlanItem> planned, bool commit,
+                               Journal journal, Action<Journal>? notify)
+    {
+        var pending = new List<(PlanItem Item, ChangeRecord Record)>();
+        int conformes = 0;
+
+        foreach (var item in planned)
+        {
+            var rec = item.Change.Capture();
+            if (rec.IsNoOp) { conformes++; continue; }
+            pending.Add((item, rec));
+        }
+
+        journal.Blank();
+        journal.Step($"Plan : {pending.Count} modification(s)"
+                   + (conformes > 0 ? $", {conformes} valeur(s) déjà conforme(s)" : ""));
+        journal.Blank();
+
+        if (pending.Count == 0)
+        {
+            journal.Ok("Le système est déjà dans l'état visé.");
+            journal.Info($"Journal : {journal.Path}");
+            return 0;
+        }
+
+        string? currentGroup = null;
+        foreach (var (item, rec) in pending)
+        {
+            if (item.Group != currentGroup)
+            {
+                currentGroup = item.Group;
+                journal.Info($"[{item.Group}] niveau {item.Level}");
+            }
             journal.Info($"  - {rec.Description}");
             journal.Info($"    {rec.Render()}");
         }
 
+        var records = pending.Select(p => p.Record).ToList();
         journal.Blank();
 
         if (!commit)
@@ -111,19 +211,18 @@ internal static class Program
             return 0;
         }
 
-        // 3. Point de restauration AVANT toute écriture.
-        var snapshot = Snapshot.Create(theme.Name, records);
+        // Point de restauration AVANT toute écriture.
+        var snapshot = Snapshot.Create(planName, records);
         string snapPath = snapshot.Save();
         journal.Step($"Point de restauration : {snapPath}");
         journal.Blank();
 
-        // 4. Application, avec retour arrière automatique en cas d'échec.
         int applied = 0;
         try
         {
-            foreach (var (_, change) in planned)
+            foreach (var (item, _) in pending)
             {
-                change.Apply();
+                item.Change.Apply();
                 applied++;
             }
             journal.Ok($"{applied} modification(s) appliquée(s)");
@@ -144,18 +243,16 @@ internal static class Program
             return 1;
         }
 
-        // 5. Notification du shell.
-        journal.Blank();
-        journal.Step("Notification du système");
-        foreach (var m in Modules.Where(m => m.AppliesTo(theme)))
+        if (notify is not null)
         {
-            try { m.PostApply(theme, journal); }
-            catch (Exception ex) { journal.Warn($"{m.Name} : {ex.Message}"); }
+            journal.Blank();
+            journal.Step("Notification du système");
+            notify(journal);
         }
 
         journal.Blank();
         journal.Step("Terminé.");
-        journal.Info($"Annuler : kurogane restore --last");
+        journal.Info("Annuler : kurogane restore --last --commit");
         journal.Info($"Journal : {journal.Path}");
         return 0;
     }
@@ -277,6 +374,13 @@ internal static class Program
               list
                   Liste les points de restauration.
 
+              probe-icons [--commit]
+                  Écrit une icône témoin dans toutes les cibles de
+                  substitution candidates, pour découvrir lesquelles cette
+                  version de Windows accepte réellement. Un terminal
+                  administrateur ajoute les cibles de niveau 2.
+                  S'annule comme le reste : restore --last --commit.
+
             PRINCIPE
               La simulation est le mode par défaut : --commit est toujours
               nécessaire pour écrire. Chaque application enregistre l'état
@@ -286,6 +390,7 @@ internal static class Program
             EXEMPLE
               kurogane apply --theme themes\kurogane-obsidian.json
               kurogane apply --theme themes\kurogane-obsidian.json --commit
+              kurogane probe-icons --commit
               kurogane restore --last --commit
             """);
     }

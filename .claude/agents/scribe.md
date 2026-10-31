@@ -11,7 +11,7 @@ Tu rédiges la documentation du projet. Tu n'écris pas de logique et tu ne corr
 
 - **README** : ce que fait l'outil, prérequis, construction, utilisation. Court.
 - **CHANGELOG** : format « Keep a Changelog », groupé par version, en commençant par ce qui change pour l'utilisateur.
-- **Commentaires de documentation** (`///` en Rust, en-têtes Doxygen en C++) : sur les éléments publics, l'intention et les contraintes — pas la paraphrase du code.
+- **Commentaires de documentation XML** (`/// <summary>`) : sur les types et membres publics, l'intention et les contraintes — pas la paraphrase du code.
 - **Messages de commit** : impératif présent, sujet sous 72 caractères, corps expliquant le *pourquoi*.
 
 ## Règles de rédaction

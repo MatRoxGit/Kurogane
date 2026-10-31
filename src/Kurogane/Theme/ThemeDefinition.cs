@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Kurogane.Theme;
@@ -12,6 +12,7 @@ public sealed class ThemeDefinition
     public DarkModeSection? DarkMode { get; set; }
     public AccentSection?   Accent   { get; set; }
     public WallpaperSection? Wallpaper { get; set; }
+    public IconsSection?    Icons     { get; set; }
 
     /// <summary>Dossier d'où le thème a été chargé — sert à résoudre les chemins relatifs.</summary>
     [JsonIgnore]
@@ -36,6 +37,10 @@ public sealed class ThemeDefinition
         theme.BaseDirectory = Path.GetDirectoryName(full) ?? "";
         return theme;
     }
+
+    /// <summary>Chemin absolu d'une icône, résolu depuis la base déclarée.</summary>
+    public string ResolveIcon(string fileName) =>
+        Resolve(Path.Combine(Icons?.Directory ?? "", fileName));
 
     public string Resolve(string relativeOrAbsolute) =>
         Path.IsPathRooted(relativeOrAbsolute)
@@ -74,4 +79,23 @@ public sealed class WallpaperSection
 
     /// <summary>fill | fit | stretch | center | tile | span</summary>
     public string Style { get; set; } = "fill";
+}
+
+public sealed class IconsSection
+{
+    /// <summary>Dossier des .ico, absolu ou relatif au fichier de thème.</summary>
+    public string Directory { get; set; } = "";
+
+    // Niveau 1 — HKCU, sans élévation
+    public string? CePc { get; set; }
+    public string? Reseau { get; set; }
+    public string? Utilisateur { get; set; }
+    public string? PanneauConfiguration { get; set; }
+    public string? CorbeilleVide { get; set; }
+    public string? CorbeillePleine { get; set; }
+
+    // Niveau 2 — HKLM, administrateur requis
+    public string? Dossier { get; set; }
+    public string? Lecteur { get; set; }
+    public string? RaccourciFleche { get; set; }
 }

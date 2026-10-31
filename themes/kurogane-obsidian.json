@@ -1,6 +1,6 @@
 {
   "name": "Kurogane Obsidian",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Mathieu",
 
   "darkMode": {
@@ -13,5 +13,20 @@
     "titleBars": true,
     "taskbarAndStart": true,
     "transparency": false
+  },
+
+  "icons": {
+    "directory": "../assets/icons",
+
+    "cePc":                 "ce-pc.ico",
+    "reseau":               "reseau.ico",
+    "utilisateur":          "utilisateur.ico",
+    "panneauConfiguration": "panneau-configuration.ico",
+    "corbeilleVide":        "corbeille-vide.ico",
+    "corbeillePleine":      "corbeille-pleine.ico",
+
+    "dossier":              "dossier.ico",
+    "lecteur":              "lecteur.ico",
+    "raccourciFleche":      "raccourci-fleche.ico"
   }
 }
