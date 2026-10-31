@@ -1,0 +1,17 @@
+{
+  "name": "Kurogane Obsidian",
+  "version": "0.1.0",
+  "author": "Mathieu",
+
+  "darkMode": {
+    "apps": true,
+    "system": true
+  },
+
+  "accent": {
+    "color": "#C8102E",
+    "titleBars": true,
+    "taskbarAndStart": true,
+    "transparency": false
+  }
+}

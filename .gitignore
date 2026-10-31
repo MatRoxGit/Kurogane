@@ -1,0 +1,28 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Visual Studio
+.vs/
+*.vsp
+*.vspx
+
+## Sorties et artefacts locaux
+artifacts/
+publish/
+*.log
+
+## Assets lourds en cours de travail (sources Photoshop / Illustrator)
+## Les exports finaux (.png, .ico) sont versionnés, pas les sources.
+assets/**/*.psd
+assets/**/*.ai
+assets/**/*.psb
+
+## Système
+Thumbs.db
+desktop.ini
+.DS_Store
