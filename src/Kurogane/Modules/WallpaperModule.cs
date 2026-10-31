@@ -1,4 +1,4 @@
-using Kurogane.Core;
+﻿using Kurogane.Core;
 using Kurogane.Native;
 using Kurogane.Theme;
 using Microsoft.Win32;
@@ -20,7 +20,7 @@ public sealed class WallpaperModule : IThemeModule
     public bool AppliesTo(ThemeDefinition theme) =>
         theme.Wallpaper is not null && !string.IsNullOrWhiteSpace(theme.Wallpaper.Path);
 
-    public IEnumerable<RegistryChange> Plan(ThemeDefinition theme)
+    public IEnumerable<IChange> Plan(ThemeDefinition theme)
     {
         var w = theme.Wallpaper!;
         string path = theme.Resolve(w.Path);

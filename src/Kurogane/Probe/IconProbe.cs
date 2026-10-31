@@ -91,6 +91,21 @@ public static class IconProbe
     //  Cibles candidates
     // ------------------------------------------------------------------
 
+    /// <summary>
+    /// GUID des dossiers du profil tels qu'ils apparaissent dans « Ce PC » et
+    /// dans le volet de navigation. Ce ne sont PAS les GUID d'icones du
+    /// Bureau, ni les FOLDERID de l'API Known Folders.
+    /// </summary>
+    private static readonly (string Nom, string Guid)[] DossiersSpeciaux =
+    {
+        ("Bureau",          "{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}"),
+        ("Documents",       "{d3162b92-9365-467a-956b-92703aca08af}"),
+        ("Telechargements", "{088e3905-0323-4b02-9826-5d99428e115f}"),
+        ("Musique",         "{3dfdf296-dbec-4fb4-81d1-6a3438bcf4de}"),
+        ("Images",          "{24ad3ad4-a569-4530-98e1-ab02f9417aa8}"),
+        ("Videos",          "{f86fa3ab-70d2-4fc7-9c99-fcbf05467f3a}"),
+    };
+
     public static List<(string Group, int Level, RegistryChange Change)> Targets(
         string iconPath, bool includeHklm)
     {
@@ -143,8 +158,35 @@ public static class IconProbe
             }));
         }
 
+        // --- Niveau 1 : dossiers speciaux (HKCU\\Software\\Classes) ----------
+        // Bureau, Documents, Telechargements, Musique, Images, Videos passent
+        // par CLSID\\{GUID}\\DefaultIcon et NON par Shell Icons 3 : l'icone de
+        // dossier generique ne les touche pas. GUID propres a ces entrees,
+        // distincts des GUID d'icones du Bureau.
+        //
+        // HKCR est une vue fusionnee ou HKCU prime sur HKLM. On sonde les deux
+        // pour savoir si la substitution sans elevation suffit.
+
+        foreach (var (nom, guid) in DossiersSpeciaux)
+        {
+            list.Add(("dossiers speciaux HKCU", 1, new RegistryChange
+            {
+                Module      = "dossiers speciaux HKCU",
+                Hive        = RegistryHive.CurrentUser,
+                SubKey      = $@"Software\Classes\CLSID\{guid}\DefaultIcon",
+                Name        = "",
+                Kind        = RegistryValueKind.ExpandString,
+                NewValue    = icon,
+                Description = $"{nom} (par utilisateur)",
+            }));
+        }
+
         if (!includeHklm)
             return list;
+
+        // Les memes cles cote HKLM appartiennent a TrustedInstaller : refusees
+        // meme en administrateur, verifie le 31/10/2026. Voie fermee, on ne
+        // les sonde plus.
 
         // --- Niveau 2 : Shell Icons (HKLM) ----------------------------
         // Index non documentes. On sonde ceux qui reviennent le plus dans la

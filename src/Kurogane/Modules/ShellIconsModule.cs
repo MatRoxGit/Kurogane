@@ -30,7 +30,7 @@ public sealed class ShellIconsModule : IThemeModule
     public bool AppliesTo(ThemeDefinition theme) =>
         theme.Icons is { } i && (i.Dossier ?? i.Lecteur ?? i.RaccourciFleche) is not null;
 
-    public IEnumerable<RegistryChange> Plan(ThemeDefinition theme)
+    public IEnumerable<IChange> Plan(ThemeDefinition theme)
     {
         var i = theme.Icons!;
 

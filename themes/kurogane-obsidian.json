@@ -1,32 +1,37 @@
 {
   "name": "Kurogane Obsidian",
-  "version": "0.2.0",
+  "version": "0.3.1",
   "author": "Mathieu",
-
   "darkMode": {
     "apps": true,
     "system": true
   },
-
   "accent": {
     "color": "#C8102E",
     "titleBars": true,
     "taskbarAndStart": true,
     "transparency": false
   },
-
+  "wallpaper": {
+    "path": "../assets/wallpapers/Wallpaper_Kurogane.jpg",
+    "style": "fill"
+  },
   "icons": {
     "directory": "../assets/icons",
-
-    "cePc":                 "ce-pc.ico",
-    "reseau":               "reseau.ico",
-    "utilisateur":          "utilisateur.ico",
+    "cePc": "ce-pc.ico",
+    "reseau": "reseau.ico",
+    "utilisateur": "utilisateur.ico",
     "panneauConfiguration": "panneau-configuration.ico",
-    "corbeilleVide":        "corbeille-vide.ico",
-    "corbeillePleine":      "corbeille-pleine.ico",
-
-    "dossier":              "dossier.ico",
-    "lecteur":              "lecteur.ico",
-    "raccourciFleche":      "raccourci-fleche.ico"
+    "corbeilleVide": "corbeille-vide.ico",
+    "corbeillePleine": "corbeille-pleine.ico",
+    "bureau": "bureau.ico",
+    "documents": "documents.ico",
+    "telechargements": "telechargements.ico",
+    "images": "images.ico",
+    "musique": "musique.ico",
+    "videos": "videos.ico",
+    "dossier": "dossier.ico",
+    "lecteur": "lecteur.ico",
+    "raccourciFleche": "raccourci-fleche.ico"
   }
 }

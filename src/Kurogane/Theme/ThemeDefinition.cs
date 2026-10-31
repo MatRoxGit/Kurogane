@@ -93,6 +93,14 @@ public sealed class IconsSection
     public string? PanneauConfiguration { get; set; }
     public string? CorbeilleVide { get; set; }
     public string? CorbeillePleine { get; set; }
+    public string? Bureau { get; set; }
+
+    // Niveau 1 — desktop.ini dans le dossier du profil
+    public string? Documents { get; set; }
+    public string? Telechargements { get; set; }
+    public string? Images { get; set; }
+    public string? Musique { get; set; }
+    public string? Videos { get; set; }
 
     // Niveau 2 — HKLM, administrateur requis
     public string? Dossier { get; set; }

@@ -1,4 +1,4 @@
-using Kurogane.Core;
+﻿using Kurogane.Core;
 using Kurogane.Native;
 using Kurogane.Theme;
 using Microsoft.Win32;
@@ -20,7 +20,7 @@ public sealed class DarkModeModule : IThemeModule
 
     public bool AppliesTo(ThemeDefinition theme) => theme.DarkMode is not null;
 
-    public IEnumerable<RegistryChange> Plan(ThemeDefinition theme)
+    public IEnumerable<IChange> Plan(ThemeDefinition theme)
     {
         var d = theme.DarkMode!;
 

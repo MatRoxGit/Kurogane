@@ -1,4 +1,5 @@
-using System.Globalization;
+﻿using System.Globalization;
+using System.Security;
 using Microsoft.Win32;
 
 namespace Kurogane.Core;
@@ -8,7 +9,7 @@ namespace Kurogane.Core;
 /// Invariant du projet : on ne construit jamais une écriture sans savoir
 /// la défaire. Capture() lit l'état d'origine, Revert() le rétablit.
 /// </summary>
-public sealed class RegistryChange
+public sealed class RegistryChange : IChange
 {
     public required string Module { get; init; }
     public required RegistryHive Hive { get; init; }
@@ -17,6 +18,12 @@ public sealed class RegistryChange
     public required RegistryValueKind Kind { get; init; }
     public required object NewValue { get; init; }
     public required string Description { get; init; }
+
+    /// <summary>
+    /// true quand la permission sera obtenue par une prise de possession
+    /// placee plus tot dans le meme plan.
+    /// </summary>
+    public bool DeferWriteCheck { get; init; }
 
     public string Target => $"{HiveName(Hive)}\\{SubKey}\\{Name}";
 
@@ -37,6 +44,7 @@ public sealed class RegistryChange
 
         return new ChangeRecord
         {
+            Kind              = ChangeKind.RegistryValue,
             Module            = Module,
             Target            = Target,
             Description       = Description,
@@ -49,6 +57,47 @@ public sealed class RegistryChange
             NewValueKind      = Kind.ToString(),
             NewValue          = Encode(NewValue, Kind),
         };
+    }
+
+    // ---------- controle d'ecriture ----------
+
+    /// <summary>
+    /// Teste si cette ecriture est permise, sans rien modifier.
+    ///
+    /// L'elevation ne suffit pas a le savoir : la permission se joue cle par
+    /// cle. Certaines cles de HKLM\\SOFTWARE\\Classes appartiennent a
+    /// TrustedInstaller et resistent a un administrateur. On remonte donc
+    /// jusqu'a la premiere cle existante du chemin et on tente de l'ouvrir en
+    /// ecriture.
+    /// </summary>
+    public bool CanWrite()
+    {
+        try
+        {
+            using var baseKey = RegistryKey.OpenBaseKey(Hive, RegistryView.Default);
+
+            string chemin = SubKey;
+            while (chemin.Length > 0)
+            {
+                using (var lecture = baseKey.OpenSubKey(chemin, writable: false))
+                {
+                    if (lecture is not null)
+                    {
+                        using var ecriture = baseKey.OpenSubKey(chemin, writable: true);
+                        return ecriture is not null;
+                    }
+                }
+
+                int i = chemin.LastIndexOf('\\');
+                if (i < 0) break;
+                chemin = chemin[..i];
+            }
+
+            // Aucune cle du chemin n'existe : indecidable sans ecrire.
+            return true;
+        }
+        catch (UnauthorizedAccessException) { return false; }
+        catch (SecurityException)           { return false; }
     }
 
     // ---------- application ----------
@@ -67,26 +116,38 @@ public sealed class RegistryChange
 
     public static void Revert(ChangeRecord r)
     {
-        RegistryHive hive = ParseHive(r.Hive);
+        // Un enregistrement de registre doit porter ses trois coordonnees. Un
+        // point de restauration incomplet est un defaut grave : mieux vaut
+        // s'arreter en le nommant que deviner.
+        if (r.Hive is not { } ruche || r.SubKey is not { } sousCle || r.Name is not { } nom)
+            throw new InvalidDataException(
+                $"Enregistrement de registre incomplet pour « {r.Target} » : "
+              + "ruche, chemin ou nom de valeur absent du point de restauration.");
+
+        RegistryHive hive = ParseHive(ruche);
         using var baseKey = RegistryKey.OpenBaseKey(hive, RegistryView.Default);
 
         if (r.Existed)
         {
-            using var key = baseKey.CreateSubKey(r.SubKey, writable: true)
-                ?? throw new InvalidOperationException(
-                    $"Restauration impossible : {r.Hive}\\{r.SubKey}");
+            if (r.OriginalValueKind is not { } typeOrigine || r.OriginalValue is not { } valeurOrigine)
+                throw new InvalidDataException(
+                    $"Valeur d'origine absente du point de restauration pour « {r.Target} ».");
 
-            var kind = Enum.Parse<RegistryValueKind>(r.OriginalValueKind!);
-            key.SetValue(r.Name, Decode(r.OriginalValue!, kind), kind);
+            using var key = baseKey.CreateSubKey(sousCle, writable: true)
+                ?? throw new InvalidOperationException(
+                    $"Restauration impossible : {ruche}\\{sousCle}");
+
+            var kind = Enum.Parse<RegistryValueKind>(typeOrigine);
+            key.SetValue(nom, Decode(valeurOrigine, kind), kind);
         }
         else
         {
             // La valeur n'existait pas avant nous : la bonne restauration est
-            // de la retirer. On ne supprime jamais la clé parente, même si on
-            // l'a créée — une clé vide est inerte, une clé supprimée peut
+            // de la retirer. On ne supprime jamais la cle parente, meme si on
+            // l'a creee — une cle vide est inerte, une cle supprimee peut
             // casser autre chose.
-            using var key = baseKey.OpenSubKey(r.SubKey, writable: true);
-            key?.DeleteValue(r.Name, throwOnMissingValue: false);
+            using var key = baseKey.OpenSubKey(sousCle, writable: true);
+            key?.DeleteValue(nom, throwOnMissingValue: false);
         }
     }
 

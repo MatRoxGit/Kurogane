@@ -3,8 +3,9 @@
 Personnalisation visuelle de Windows 11, entièrement réversible.
 
 Kurogane applique un thème décrit dans un fichier JSON — mode sombre, couleur
-d'accent, fond d'écran — en n'utilisant que des mécanismes documentés par
-Microsoft. Aucun fichier système n'est modifié, aucune DLL n'est patchée.
+d'accent, fond d'écran, icônes du shell — en n'utilisant que des mécanismes
+documentés par Microsoft : clés de registre et `desktop.ini`. Aucun fichier
+système n'est remplacé, aucune DLL n'est patchée.
 
 > `Kurogane` (黒鉄, « fer noir ») est un nom de travail. Le thème livré,
 > *Obsidian*, est une création originale : il ne reprend ni le nom, ni le logo,
@@ -52,19 +53,33 @@ kurogane list
 # Revenir en arrière (simulation, puis réel)
 kurogane restore --last
 kurogane restore --last --commit
+
+# Forcer le shell à relire les icônes
+kurogane refresh-icons           # notification + ie4uinit
+kurogane refresh-icons --purge    # purge du cache, redémarre explorer
 ```
+
+Un `.ico` remplacé sans changer de nom ne produit aucune modification de
+registre : le registre stocke un chemin, pas un contenu. C'est le rôle de
+`refresh-icons --purge`, le cache d'icônes survivant à un redémarrage
+d'explorer.
 
 Points de restauration : `%LOCALAPPDATA%\Kurogane\snapshots\`
 Journaux : `%LOCALAPPDATA%\Kurogane\logs\`
 
-Aucun droit administrateur n'est requis : tout se passe dans `HKEY_CURRENT_USER`.
+Les modules de niveau 1 (mode sombre, accent, fond d'écran, icônes du Bureau,
+dossiers du profil) n'exigent aucune élévation. Les icônes génériques — dossier,
+lecteur, flèche de raccourci — écrivent dans `HKEY_LOCAL_MACHINE` et demandent
+une invite administrateur. Sans élévation, l'outil l'annonce avant de poser le
+point de restauration et n'écrit rien : la permission est vérifiée clé par clé,
+l'élévation ne la garantissant pas.
 
 ## Le fichier de thème
 
 ```json
 {
   "name": "Kurogane Obsidian",
-  "version": "0.1.0",
+  "version": "0.3.1",
 
   "darkMode":  { "apps": true, "system": true },
 
@@ -76,11 +91,25 @@ Aucun droit administrateur n'est requis : tout se passe dans `HKEY_CURRENT_USER`
   },
 
   "wallpaper": {
-    "path": "../assets/wallpapers/obsidian-4k.png",
+    "path": "../assets/wallpapers/Wallpaper_Kurogane.jpg",
     "style": "fill"
+  },
+
+  "icons": {
+    "directory": "../assets/icons",
+    "cePc": "ce-pc.ico",
+    "corbeilleVide": "corbeille-vide.ico",
+    "corbeillePleine": "corbeille-pleine.ico",
+    "dossier": "dossier.ico",
+    "lecteur": "lecteur.ico",
+    "raccourciFleche": "raccourci-fleche.ico"
   }
 }
 ```
+
+La section `icons` accepte quinze entrées ; l'exemple n'en montre que six.
+Chaque entrée est facultative et une icône absente laisse celle de Windows en
+place.
 
 Toute section absente est simplement ignorée : un thème qui ne déclare que
 `accent` ne touchera pas au fond d'écran. Les chemins relatifs sont résolus
@@ -94,27 +123,40 @@ Ajustements acceptés pour le fond d'écran : `fill`, `fit`, `stretch`,
 ```
 src/Kurogane/
 ├── Core/
-│   ├── RegistryChange.cs   Une écriture + sa capture + son inverse
-│   ├── ChangeRecord.cs     Trace sérialisable d'une modification
-│   ├── Snapshot.cs         Point de restauration (write-ahead, écriture atomique)
-│   ├── Journal.cs          Journal console + fichier
-│   └── ColorUtil.cs        Conversions ABGR / ARGB, nuancier d'accent
+│   ├── ChangeRecord.cs      Trace sérialisable d'une modification, et son inverse
+│   ├── RegistryChange.cs    Écriture de registre : capture, contrôle d'accès, inverse
+│   ├── FileChange.cs        Écriture de fichier : contenu, attributs, fusion desktop.ini
+│   ├── OwnershipChange.cs   Prise de possession d'une clé protégée (voir plus bas)
+│   ├── Privileges.cs        SeTakeOwnership / SeRestore
+│   ├── Snapshot.cs          Point de restauration (write-ahead, écriture atomique)
+│   ├── Journal.cs           Journal console + fichier
+│   ├── IconCache.cs         Rafraîchissement et purge du cache d'icônes
+│   ├── IcoWriter.cs         Écriture de .ico multi-résolution, sans dépendance
+│   ├── Elevation.cs         Droit d'écriture effectif dans HKLM
+│   └── ColorUtil.cs         Conversions ABGR / ARGB, nuancier d'accent
 ├── Modules/
-│   ├── IThemeModule.cs     Plan() sans effet de bord, PostApply() notifie
+│   ├── IThemeModule.cs      Plan() sans effet de bord, PostApply() notifie
 │   ├── DarkModeModule.cs
 │   ├── AccentModule.cs
-│   └── WallpaperModule.cs
+│   ├── WallpaperModule.cs
+│   ├── DesktopIconsModule.cs    Icônes du Bureau            (HKCU)
+│   ├── SpecialFoldersModule.cs  Dossiers du profil          (desktop.ini)
+│   └── ShellIconsModule.cs      Dossier, lecteur, raccourci (HKLM)
+├── Probe/
+│   ├── IconProbe.cs         Diagnostic : quelles cibles répondent
+│   └── OwnershipProbe.cs    Diagnostic : clés protégées
 ├── Native/
-│   └── NativeMethods.cs    SystemParametersInfo, WM_SETTINGCHANGE, SHChangeNotify
+│   └── NativeMethods.cs     SystemParametersInfo, WM_SETTINGCHANGE, SHChangeNotify
 ├── Theme/
-│   └── ThemeDefinition.cs  Modèle du fichier JSON
-└── Program.cs              CLI
+│   └── ThemeDefinition.cs   Modèle du fichier JSON
+└── Program.cs               CLI
 ```
 
 Pour ajouter un module : implémenter `IThemeModule` et l'inscrire dans le
 tableau `Modules` de `Program.cs`. Le contrat est strict — `Plan()` ne doit
-avoir aucun effet de bord. Tout ce qui écrit passe par les `RegistryChange`
-retournés, donc par la capture et le point de restauration.
+avoir aucun effet de bord. Tout ce qui écrit passe par les objets `IChange`
+retournés, donc par la capture et le point de restauration. Deux natures de
+modification cohabitent, registre et fichier, sous le même contrat.
 
 ## Portée
 
@@ -131,6 +173,45 @@ prendre possession de fichiers système. Les deux cassent à chaque mise à jour
 cumulative et ne se défont pas proprement : c'est incompatible avec la
 première garantie du projet.
 
+## Niveau 3 — prise de possession : disponible, non utilisé
+
+Le dépôt contient `OwnershipChange` et `Privileges`, capables de prendre
+possession d'une clé de registre protégée et de restituer son descripteur de
+sécurité complet. **Aucun module de thème ne les appelle**, et ils ne sont
+atteignables que par la commande de diagnostic `probe-ownership`, qui exige
+deux autorisations explicites :
+
+```
+kurogane probe-ownership --commit --autoriser-prise-de-possession
+```
+
+Pourquoi ce code existe et pourquoi il ne sert pas : les six dossiers du
+profil affichés dans l'Accès rapide gardent leurs icônes Windows, et les clés
+qui semblaient les piloter sont protégées en écriture. L'hypothèse a été
+testée le 31/10/2026 en prenant possession des deux familles candidates
+(`SOFTWARE\Classes\CLSID\{CLSID}\DefaultIcon` et
+`...\Explorer\FolderDescriptions\{FOLDERID}\Icon`) et en y écrivant une icône
+témoin. **Aucun effet.** Ces icônes viennent d'ailleurs.
+
+Précision utile : ces clés appartiennent à `NT AUTHORITY\SYSTEM`, pas à
+TrustedInstaller. C'est la liste d'accès qui bloque l'écriture, TrustedInstaller
+y détenant le contrôle total. La formule courante « clés TrustedInstaller »
+confond propriété et droit d'écriture.
+
+Si tu envisages de réutiliser ce code : une mise à jour cumulative de Windows
+peut réécrire ces clés et réinitialiser leurs permissions, et un outil qui
+modifie la sécurité du système sur la machine d'un tiers est à considérer avec
+la plus grande prudence.
+
 ## État
 
-v0.1.0 — modules mode sombre, accent et fond d'écran. Niveau 2 à venir.
+v0.3.1 — mode sombre, accent, fond d'écran, et 15 icônes réparties sur trois
+mécanismes : registre utilisateur, registre machine, `desktop.ini`.
+
+Limite connue : les six dossiers du profil affichés dans l'Accès rapide
+gardent leurs icônes Windows. Quatre voies ont été testées et écartées, le
+relevé est dans `claude/mecanismes-icones-verifies.md`.
+
+Dette technique à régler avant tout empaquetage : les chemins d'icônes écrits
+dans le registre et dans les `desktop.ini` sont absolus et pointent vers le
+dossier de travail. Ils devront viser `%LOCALAPPDATA%\Kurogane\icons\`.

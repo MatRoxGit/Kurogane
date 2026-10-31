@@ -23,6 +23,7 @@ public sealed class DesktopIconsModule : IThemeModule
     private const string Utilisateur = "{59031a47-3f72-44a7-89c5-5595fe6b30ee}";
     private const string Panneau     = "{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}";
     private const string Corbeille   = "{645FF040-5081-101B-9F08-00AA002F954E}";
+    private const string BureauClsid = "{B4BFCC3A-DB2C-424C-B029-7FE99A87C641}";
 
     public string Name => "icones-bureau";
     public int Level => 1;
@@ -30,9 +31,9 @@ public sealed class DesktopIconsModule : IThemeModule
     public bool AppliesTo(ThemeDefinition theme) =>
         theme.Icons is { } i &&
         (i.CePc ?? i.Reseau ?? i.Utilisateur ?? i.PanneauConfiguration
-              ?? i.CorbeilleVide ?? i.CorbeillePleine) is not null;
+              ?? i.CorbeilleVide ?? i.CorbeillePleine ?? i.Bureau) is not null;
 
-    public IEnumerable<RegistryChange> Plan(ThemeDefinition theme)
+    public IEnumerable<IChange> Plan(ThemeDefinition theme)
     {
         var i = theme.Icons!;
 
@@ -59,12 +60,47 @@ public sealed class DesktopIconsModule : IThemeModule
 
         if (i.CorbeillePleine is { } f)
             yield return Entree(theme, Corbeille, "full", f, "Corbeille pleine");
+
+        // Le Bureau n'est pas sous Explorer\\CLSID mais sous Software\\Classes,
+        // et c'est le seul dossier du profil que cette voie atteigne encore
+        // sous Windows 11 — les cinq autres passent par desktop.ini.
+        if (i.Bureau is { } g)
+            yield return EntreeClasses(theme, BureauClsid, g, "Icone Bureau");
     }
 
     public void PostApply(ThemeDefinition theme, Journal journal)
     {
         NativeMethods.RefreshShellIcons();
         journal.Ok("Cache d'icones du shell invalide");
+    }
+
+    private RegistryChange EntreeClasses(ThemeDefinition theme, string guid,
+                                         string fichier, string description)
+    {
+        string chemin = Chemin(theme, fichier);
+
+        return new RegistryChange
+        {
+            Module      = Name,
+            Hive        = RegistryHive.CurrentUser,
+            SubKey      = $@"Software\Classes\CLSID\{guid}\DefaultIcon",
+            Name        = "",
+            Kind        = RegistryValueKind.ExpandString,
+            NewValue    = $"{chemin},0",
+            Description = $"{description} — {Path.GetFileName(chemin)}",
+        };
+    }
+
+    private static string Chemin(ThemeDefinition theme, string fichier)
+    {
+        string chemin = theme.ResolveIcon(fichier);
+
+        if (!File.Exists(chemin))
+            throw new FileNotFoundException(
+                $"Icone introuvable : {chemin}\n" +
+                $"(declaree dans le theme « {theme.Name} » comme « {fichier} »)");
+
+        return chemin;
     }
 
     private RegistryChange Entree(ThemeDefinition theme, string guid, string valeur,

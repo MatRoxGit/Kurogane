@@ -1,4 +1,4 @@
-using Kurogane.Core;
+﻿using Kurogane.Core;
 using Kurogane.Theme;
 
 namespace Kurogane.Modules;
@@ -22,7 +22,7 @@ public interface IThemeModule
     bool AppliesTo(ThemeDefinition theme);
 
     /// <summary>Écritures prévues. Lecture seule, aucun effet de bord.</summary>
-    IEnumerable<RegistryChange> Plan(ThemeDefinition theme);
+    IEnumerable<IChange> Plan(ThemeDefinition theme);
 
     /// <summary>Notification du shell après écriture. N'est pas appelé en simulation.</summary>
     void PostApply(ThemeDefinition theme, Journal journal);

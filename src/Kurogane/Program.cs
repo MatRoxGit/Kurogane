@@ -7,7 +7,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.1.0";
+    private const string Version = "0.3.0";
 
     private static readonly IThemeModule[] Modules =
     {
@@ -15,6 +15,7 @@ internal static class Program
         new AccentModule(),
         new WallpaperModule(),
         new DesktopIconsModule(),
+        new SpecialFoldersModule(),
         new ShellIconsModule(),
     };
 
@@ -31,7 +32,9 @@ internal static class Program
                 "apply"    => CmdApply(args),
                 "restore"  => CmdRestore(args),
                 "list"     => CmdList(),
+                "refresh-icons" => CmdRefreshIcons(args),
                 "probe-icons" => CmdProbe(args),
+                "probe-ownership" => CmdProbeOwnership(args),
                 _          => Unknown(args[0]),
             };
         }
@@ -102,6 +105,39 @@ internal static class Program
         });
     }
 
+    // -------------------------------------------------------- refresh-icons
+
+    private static int CmdRefreshIcons(string[] args)
+    {
+        bool complet = Has(args, "--purge");
+
+        using var journal = new Journal("refresh-icons");
+
+        journal.Step("Rafraîchissement du cache d'icônes");
+        journal.Info("Les icônes sont référencées par chemin : remplacer un .ico sans");
+        journal.Info("changer son nom ne modifie aucune valeur, et Windows continue");
+        journal.Info("d'afficher l'ancienne image depuis son cache.");
+        journal.Blank();
+
+        if (complet)
+        {
+            journal.Warn("Purge complète : toutes les fenêtres de l'Explorateur vont se fermer.");
+            journal.Blank();
+            IconCache.PurgerEtRedemarrer(journal);
+        }
+        else
+        {
+            IconCache.Rafraichir(journal);
+            journal.Blank();
+            journal.Info("Si l'ancienne icône persiste, la purge complète est plus sûre :");
+            journal.Info("  kurogane refresh-icons --purge");
+        }
+
+        journal.Blank();
+        journal.Info($"Journal : {journal.Path}");
+        return 0;
+    }
+
     // ---------------------------------------------------------- probe-icons
 
     private static int CmdProbe(string[] args)
@@ -149,9 +185,90 @@ internal static class Program
         });
     }
 
+    // ------------------------------------------------- probe-ownership (N3)
+
+    private const string DrapeauPossession = "--autoriser-prise-de-possession";
+
+    private static int CmdProbeOwnership(string[] args)
+    {
+        bool commit   = Has(args, "--commit");
+        bool autorise = Has(args, DrapeauPossession);
+
+        using var journal = new Journal(commit ? "probe-ownership" : "probe-ownership-simulation");
+
+        journal.Step("SONDE DE NIVEAU 3 — PRISE DE POSSESSION DE CLÉS SYSTÈME");
+        journal.Blank();
+        journal.Warn("Cette opération modifie la SÉCURITÉ du système, pas son apparence.");
+        journal.Warn("Elle attribue au groupe Administrateurs la propriété de clés");
+        journal.Warn("détenues par SYSTEM et protégées en écriture.");
+        journal.Blank();
+        journal.Warn("OUTIL DE DIAGNOSTIC. L'enquête du 31/10/2026 a conclu que cette");
+        journal.Warn("voie ne change RIEN aux icônes de l'Accès rapide. Aucun module de");
+        journal.Warn("thème ne l'utilise, et elle n'a pas vocation à être livrée.");
+        journal.Blank();
+        journal.Info("Le descripteur de sécurité d'origine est capturé en entier et");
+        journal.Info("restituable par restore. Mais une mise à jour cumulative de Windows");
+        journal.Info("peut réécrire ces clés et réinitialiser leurs permissions.");
+        journal.Blank();
+        journal.Info("À n'exécuter que sur une machine de test disposant d'un point de");
+        journal.Info("contrôle.");
+        journal.Blank();
+
+        if (!autorise)
+        {
+            journal.Error($"Autorisation absente. Ajouter {DrapeauPossession} pour continuer.");
+            journal.Info($"Journal : {journal.Path}");
+            return 2;
+        }
+
+        if (!Elevation.CanWriteHklm())
+        {
+            journal.Error("Session non élevée : terminal administrateur requis.");
+            journal.Info($"Journal : {journal.Path}");
+            return 2;
+        }
+
+        // Les privilèges sont vérifiés AVANT toute écriture : sans de quoi
+        // rendre la propriété, on ne la prend pas.
+        try { Privileges.EnablePourPriseDePossession(); }
+        catch (Exception ex)
+        {
+            journal.Error(ex.Message);
+            journal.Info($"Journal : {journal.Path}");
+            return 1;
+        }
+        journal.Ok("Privilèges de prise et de restitution actifs");
+
+        string icon = IconProbe.EnsureWitnessIcon();
+        journal.Info($"icône témoin : {icon}");
+
+        var planned = OwnershipProbe.Targets(icon)
+                                    .Select(t => new PlanItem(t.Group, t.Level, t.Change))
+                                    .ToList();
+
+        if (planned.Count == 0)
+        {
+            journal.Warn("Aucune clé candidate présente sur ce système.");
+            return 0;
+        }
+
+        return Execute("Sonde niveau 3", planned, commit, journal, j =>
+        {
+            Native.NativeMethods.RefreshShellIcons();
+            Native.NativeMethods.BroadcastThemeChange();
+            j.Ok("Cache d'icônes du shell invalidé");
+            j.Blank();
+            j.Info("Redémarre explorer.exe et regarde l'Accueil et le volet épinglé.");
+            j.Info("Le groupe qui aura agi — classes ou folderdesc — désigne la");
+            j.Info("famille de clés à retenir. L'autre sera abandonnée.");
+            j.Blank();
+            j.Warn("Rendre la propriété : kurogane restore --last --commit");
+        });
+    }
+
     // ------------------------------------------------------------- exécution
 
-    private sealed record PlanItem(string Group, int Level, RegistryChange Change);
+    private sealed record PlanItem(string Group, int Level, IChange Change);
 
     /// <summary>
     /// Chemin commun à toute commande qui écrit : capture de l'état d'origine,
@@ -183,6 +300,11 @@ internal static class Program
         if (pending.Count == 0)
         {
             journal.Ok("Le système est déjà dans l'état visé.");
+            journal.Blank();
+            journal.Info("Si tu viens de remplacer des fichiers d'icônes, c'est normal :");
+            journal.Info("le registre stocke leur chemin, pas leur contenu. Rien n'a changé");
+            journal.Info("pour l'outil, mais Windows affiche encore son cache.");
+            journal.Info("  kurogane refresh-icons --purge");
             journal.Info($"Journal : {journal.Path}");
             return 0;
         }
@@ -201,6 +323,25 @@ internal static class Program
 
         var records = pending.Select(p => p.Record).ToList();
         journal.Blank();
+
+        // Contrôle d'écriture AVANT toute modification. L'élévation ne dit pas
+        // tout : la permission se joue clé par clé, et certaines appartiennent
+        // à TrustedInstaller. Échouer ici coûte zéro écriture ; échouer au
+        // milieu du plan coûte un retour arrière.
+        var refusees = pending.Where(p => !p.Item.Change.DeferWriteCheck
+                                       && !p.Item.Change.CanWrite()).ToList();
+        if (refusees.Count > 0)
+        {
+            journal.Error($"{refusees.Count} cible(s) refusent l'écriture :");
+            foreach (var (_, rec) in refusees)
+                journal.Error($"  {rec.Target}");
+            journal.Blank();
+            journal.Info("Ces clés appartiennent généralement à TrustedInstaller :");
+            journal.Info("y écrire imposerait d'en prendre possession, ce que ce projet");
+            journal.Info("s'interdit. Rien n'a été écrit.");
+            journal.Info($"Journal : {journal.Path}");
+            return 1;
+        }
 
         if (!commit)
         {
@@ -234,7 +375,7 @@ internal static class Program
 
             for (int i = applied - 1; i >= 0; i--)
             {
-                try { RegistryChange.Revert(records[i]); }
+                try { Changes.Revert(records[i]); }
                 catch (Exception rex) { journal.Error($"  {records[i].Target} : {rex.Message}"); }
             }
 
@@ -300,7 +441,7 @@ internal static class Program
         int ok = 0, failed = 0;
         foreach (var r in Enumerable.Reverse(snap.Changes))
         {
-            try { RegistryChange.Revert(r); ok++; }
+            try { Changes.Revert(r); ok++; }
             catch (Exception ex) { failed++; journal.Error($"{r.Target} : {ex.Message}"); }
         }
 
@@ -373,6 +514,12 @@ internal static class Program
 
               list
                   Liste les points de restauration.
+
+              refresh-icons [--purge]
+                  Force Windows à relire les fichiers d'icônes. Utile après
+                  avoir remplacé un .ico sans changer son nom : l'outil n'a
+                  alors rien à modifier, mais le cache du shell est périmé.
+                  --purge ferme l'Explorateur et supprime ses bases de cache.
 
               probe-icons [--commit]
                   Écrit une icône témoin dans toutes les cibles de
