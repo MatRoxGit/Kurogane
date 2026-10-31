@@ -7,7 +7,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.3.0";
+    private const string Version = "0.6.0";
 
     private static readonly IThemeModule[] Modules =
     {
@@ -35,6 +35,11 @@ internal static class Program
                 "refresh-icons" => CmdRefreshIcons(args),
                 "probe-icons" => CmdProbe(args),
                 "probe-ownership" => CmdProbeOwnership(args),
+                "probe-mun" => CmdProbeMun(args),
+                "probe-mun-ecriture" => CmdProbeMunEcriture(args),
+                "substituer-mun" => CmdSubstituerMun(args),
+                "restaurer-mun" => CmdRestaurerMun(args),
+                "etat-mun" => CmdEtatMun(),
                 _          => Unknown(args[0]),
             };
         }
@@ -264,6 +269,103 @@ internal static class Program
             j.Blank();
             j.Warn("Rendre la propriété : kurogane restore --last --commit");
         });
+    }
+
+    // ------------------------------------------------------------ probe-mun
+
+    /// <summary>
+    /// Catalogue les icônes des binaires du shell. Lecture seule de bout en
+    /// bout : pas de --commit, pas de point de restauration, rien à défaire.
+    /// </summary>
+    private static int CmdProbeMun(string[] args)
+    {
+        using var journal = new Journal("probe-mun");
+        return MunProbe.Executer(journal, Flag(args, "--binaire"));
+    }
+
+    // --------------------------------------------- probe-mun-ecriture (A)
+
+    /// <summary>
+    /// Valide le graveur de ressources sur une COPIE du binaire système.
+    /// Pas de --commit : cette commande n'écrit que dans notre dossier, et
+    /// Windows continue d'utiliser son propre fichier.
+    /// </summary>
+    private static int CmdProbeMunEcriture(string[] args)
+    {
+        string? brut = Flag(args, "--ressource");
+
+        if (brut is not null && !int.TryParse(brut, out _))
+        {
+            Console.Error.WriteLine($"--ressource attend un nombre, reçu « {brut} ».");
+            return 2;
+        }
+
+        int ressource = brut is null ? 112 : int.Parse(brut);
+
+        using var journal = new Journal("probe-mun-ecriture");
+        return MunWriteProbe.Executer(journal, ressource);
+    }
+
+    // ------------------------------------------------- substitution (B)
+
+    /// <summary>
+    /// Les cinq dossiers du profil que le registre ne sait pas atteindre.
+    /// Le Bureau (183) n'y figure pas : il passe déjà par HKCU.
+    /// </summary>
+    private static readonly int[] AccesRapide = { 112, 113, 108, 184, 189 };
+
+    private static int CmdSubstituerMun(string[] args)
+    {
+        if (!TryRessources(args, out var ressources)) return 2;
+
+        using var journal = new Journal("substituer-mun");
+        return MunSubstitution.Appliquer(journal, ressources,
+            theme:    Flag(args, "--theme"),
+            commit:   Has(args, "--commit"),
+            autorise: Has(args, "--autoriser-fichier-systeme"));
+    }
+
+    private static int CmdRestaurerMun(string[] args)
+    {
+        using var journal = new Journal("restaurer-mun");
+        return MunSubstitution.Restaurer(journal, Has(args, "--commit"));
+    }
+
+    private static int CmdEtatMun()
+    {
+        using var journal = new Journal("etat-mun");
+        return MunSubstitution.Etat(journal);
+    }
+
+    private static bool TryRessources(string[] args, out int[] ressources)
+    {
+        ressources = AccesRapide;
+
+        string? brut = Flag(args, "--ressources");
+        if (brut is null) return true;
+
+        var morceaux = brut.Split(',', StringSplitOptions.RemoveEmptyEntries
+                                     | StringSplitOptions.TrimEntries);
+        var liste = new List<int>(morceaux.Length);
+
+        foreach (var m in morceaux)
+        {
+            if (!int.TryParse(m, out int n))
+            {
+                Console.Error.WriteLine($"--ressources : « {m} » n'est pas un nombre.");
+                return false;
+            }
+            liste.Add(n);
+        }
+
+        if (liste.Count == 0)
+        {
+            Console.Error.WriteLine("--ressources : liste vide.");
+            return false;
+        }
+
+        ressources = liste.ToArray();
+        return true;
     }
 
     // ------------------------------------------------------------- exécution
@@ -520,6 +622,47 @@ internal static class Program
                   avoir remplacé un .ico sans changer son nom : l'outil n'a
                   alors rien à modifier, mais le cache du shell est périmé.
                   --purge ferme l'Explorateur et supprime ses bases de cache.
+
+              probe-mun [--binaire <nom>]
+                  Catalogue les icônes stockées dans imageres.dll.mun,
+                  shell32.dll.mun et ddores.dll.mun. Extrait un .ico par
+                  groupe et produit une planche de contact HTML indexée par
+                  identifiant de ressource.
+                  Lecture seule : aucun fichier système n'est ouvert en
+                  écriture, aucune élévation n'est requise, il n'y a rien à
+                  annuler.
+
+              probe-mun-ecriture [--ressource <n>]
+                  Étape A de la substitution de ressources. Copie
+                  imageres.dll.mun dans notre dossier, y remplace un groupe
+                  d'icônes par un témoin, puis relit la copie pour vérifier
+                  que le groupe visé porte le témoin et que toutes les autres
+                  ressources sont intactes, octet pour octet.
+                  Par défaut, la ressource 112 (Documents).
+                  Le fichier système n'est ouvert qu'en lecture, pour être
+                  copié. La copie n'est pas installée.
+
+              substituer-mun [--theme <fichier.json>] [--ressources 112,113,…]
+                             [--commit] [--autoriser-fichier-systeme]
+                  Remplace des groupes d'icônes dans imageres.dll.mun, le
+                  fichier système où le shell puise ses icônes. Par défaut,
+                  les cinq dossiers du profil que le registre n'atteint pas :
+                  Documents, Images, Musique, Téléchargements, Vidéos.
+                  Avec --theme, les images viennent des .ico du thème ; sans,
+                  un témoin magenta est gravé — c'est le mode diagnostic.
+                  Le candidat est construit en mémoire et subit le contrôle
+                  d'intégrité complet AVANT que le système soit touché.
+                  Droits administrateur, double autorisation, redémarrage
+                  nécessaire. Aucun module de thème ne l'appelle.
+
+              restaurer-mun [--commit]
+                  Remet le fichier d'origine. Refuse si Windows a remplacé le
+                  fichier depuis : réinstaller un binaire périmé annulerait
+                  un correctif de sécurité.
+
+              etat-mun
+                  Indique si une substitution est en place, et si le fichier
+                  installé est toujours celui de Kurogane.
 
               probe-icons [--commit]
                   Écrit une icône témoin dans toutes les cibles de

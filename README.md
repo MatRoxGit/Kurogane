@@ -3,9 +3,13 @@
 Personnalisation visuelle de Windows 11, entièrement réversible.
 
 Kurogane applique un thème décrit dans un fichier JSON — mode sombre, couleur
-d'accent, fond d'écran, icônes du shell — en n'utilisant que des mécanismes
-documentés par Microsoft : clés de registre et `desktop.ini`. Aucun fichier
-système n'est remplacé, aucune DLL n'est patchée.
+d'accent, fond d'écran, icônes du shell.
+
+**L'application d'un thème ne touche à aucun fichier système** : uniquement des
+clés de registre et des `desktop.ini`. Une commande distincte, qui n'est
+appelée par aucun module de thème et exige une double autorisation explicite,
+peut remplacer des icônes à l'intérieur d'un binaire du shell — voir *Niveau 3*
+plus bas.
 
 > `Kurogane` (黒鉄, « fer noir ») est un nom de travail. Le thème livré,
 > *Obsidian*, est une création originale : il ne reprend ni le nom, ni le logo,
@@ -127,7 +131,13 @@ src/Kurogane/
 │   ├── RegistryChange.cs    Écriture de registre : capture, contrôle d'accès, inverse
 │   ├── FileChange.cs        Écriture de fichier : contenu, attributs, fusion desktop.ini
 │   ├── OwnershipChange.cs   Prise de possession d'une clé protégée (voir plus bas)
+│   ├── FileOwnership.cs     Prise de possession d'un fichier et de son dossier
 │   ├── Privileges.cs        SeTakeOwnership / SeRestore
+│   ├── PeResources.cs       Arbre de ressources d'un PE, remplacement sur place
+│   ├── MunPatcher.cs        Plan de substitution d'un groupe d'icônes
+│   ├── SourceIco.cs         Images d'un .ico à la taille demandée
+│   ├── IcoReader.cs         Lecture de .ico, décodage des bitmaps 32 bits
+│   ├── PngWriter.cs         Encodeur PNG sans dépendance (ZLibStream)
 │   ├── Snapshot.cs          Point de restauration (write-ahead, écriture atomique)
 │   ├── Journal.cs           Journal console + fichier
 │   ├── IconCache.cs         Rafraîchissement et purge du cache d'icônes
@@ -144,9 +154,13 @@ src/Kurogane/
 │   └── ShellIconsModule.cs      Dossier, lecteur, raccourci (HKLM)
 ├── Probe/
 │   ├── IconProbe.cs         Diagnostic : quelles cibles répondent
-│   └── OwnershipProbe.cs    Diagnostic : clés protégées
+│   ├── OwnershipProbe.cs    Diagnostic : clés protégées
+│   ├── MunProbe.cs          Catalogue des icônes système (lecture seule)
+│   ├── MunWriteProbe.cs     Validation du graveur sur copie, contrôle d'intégrité
+│   └── MunSubstitution.cs   Substitution réelle, sauvegarde et garde-fou
 ├── Native/
-│   └── NativeMethods.cs     SystemParametersInfo, WM_SETTINGCHANGE, SHChangeNotify
+│   ├── NativeMethods.cs     SystemParametersInfo, WM_SETTINGCHANGE, SHChangeNotify
+│   └── ResourceNative.cs    Lecture des ressources d'un module, en données seules
 ├── Theme/
 │   └── ThemeDefinition.cs   Modèle du fichier JSON
 └── Program.cs               CLI
@@ -166,12 +180,16 @@ Ce que l'outil fait, et ce qu'il ne fera pas :
 |---|---|
 | **Niveau 1** — `HKCU`, sans élévation | mode sombre, accent, fond d'écran, curseurs, barre des tâches |
 | **Niveau 2** — `HKLM`, administrateur | substitution d'icônes système via `Shell Icons`, écran de verrouillage |
-| **Niveau 3** — hors périmètre | `.msstyles` personnalisé, patch d'`uxtheme.dll`, modification d'`imageres.dll` |
+| **Niveau 3** — commande séparée, double autorisation | substitution d'icônes dans `imageres.dll.mun` |
+| **Hors périmètre** | `.msstyles` personnalisé, patch d'`uxtheme.dll` |
 
-Le niveau 3 exige de contourner la vérification de signature des thèmes ou de
-prendre possession de fichiers système. Les deux cassent à chaque mise à jour
-cumulative et ne se défont pas proprement : c'est incompatible avec la
-première garantie du projet.
+Le niveau 3 n'est pas appelé par l'application d'un thème. Il existe parce que
+cinq entrées du shell — Documents, Images, Musique, Téléchargements, Vidéos
+dans l'Accès rapide — sont hors d'atteinte du registre, quatre voies ayant été
+testées et écartées.
+
+Un `.msstyles` personnalisé reste hors périmètre : il demande de contourner la
+vérification de signature des thèmes, ce que ce projet ne fera pas.
 
 ## Niveau 3 — prise de possession : disponible, non utilisé
 
@@ -203,14 +221,62 @@ peut réécrire ces clés et réinitialiser leurs permissions, et un outil qui
 modifie la sécurité du système sur la machine d'un tiers est à considérer avec
 la plus grande prudence.
 
+## Niveau 3 — substitution dans un binaire du shell
+
+Cinq entrées de l'Accès rapide — Documents, Images, Musique, Téléchargements,
+Vidéos — gardent leurs icônes Windows quoi qu'on écrive dans le registre. Elles
+tirent leur image d'une ressource de `C:\Windows\SystemResources\imageres.dll.mun`.
+
+```
+kurogane probe-mun                 catalogue des icônes système (lecture seule)
+kurogane probe-mun-ecriture        valide le graveur sur une copie
+kurogane substituer-mun --theme themes\kurogane-obsidian.json
+kurogane substituer-mun --theme themes\kurogane-obsidian.json --commit --autoriser-fichier-systeme
+kurogane restaurer-mun --commit
+kurogane etat-mun
+```
+
+Ce que fait cette commande, et dans cet ordre :
+
+1. le fichier patché est construit **en mémoire**, puis écrit dans un fichier
+   d'essai local ;
+2. ce candidat subit un contrôle d'intégrité complet : relecture par
+   `LoadLibraryEx`, inventaire des ressources, et comparaison **octet pour
+   octet** des quelque 3100 ressources qui ne devaient pas changer ;
+3. le système n'est touché qu'ensuite.
+
+Le patch est **sur place** : aucun octet n'est déplacé, aucune section
+reconstruite. Une image de remplacement doit tenir dans la place de celle
+qu'elle remplace — ce qui est toujours le cas, Windows stockant ces tailles
+dans le même format que nous.
+
+Le fichier étant mappé par le shell, l'original est renommé sur place et le
+nouveau déposé à côté. **Un redémarrage est nécessaire.** L'original renommé
+reste dans `SystemResources` ; une copie part aussi dans `%LOCALAPPDATA%`.
+
+### Garde-fou de restauration
+
+La version du fichier d'origine et son empreinte SHA-256 sont enregistrées.
+Si, au moment de restaurer, le fichier en place n'est plus celui que Kurogane
+a déposé, la restauration est **refusée** : réinstaller un binaire périmé
+par-dessus un fichier mis à jour annulerait un correctif de sécurité.
+
+### Ce que cette voie coûte
+
+- La signature de catalogue du fichier ne correspond plus : `sfc /scannow`
+  peut vouloir restaurer l'original.
+- Une mise à jour cumulative remplacera le fichier et fera disparaître la
+  personnalisation.
+
+Ces deux conséquences sont inhérentes à la méthode. Elles ne sont pas
+corrigeables, seulement annoncées.
+
 ## État
 
-v0.3.1 — mode sombre, accent, fond d'écran, et 15 icônes réparties sur trois
-mécanismes : registre utilisateur, registre machine, `desktop.ini`.
-
-Limite connue : les six dossiers du profil affichés dans l'Accès rapide
-gardent leurs icônes Windows. Quatre voies ont été testées et écartées, le
-relevé est dans `claude/mecanismes-icones-verifies.md`.
+v0.6.0 — mode sombre, accent, fond d'écran, et 15 icônes réparties sur trois
+mécanismes : registre utilisateur, registre machine, `desktop.ini`. Plus, en
+commande séparée, la substitution de ressources dans `imageres.dll.mun` pour
+les cinq entrées de l'Accès rapide.
 
 Dette technique à régler avant tout empaquetage : les chemins d'icônes écrits
 dans le registre et dans les `desktop.ini` sont absolus et pointent vers le

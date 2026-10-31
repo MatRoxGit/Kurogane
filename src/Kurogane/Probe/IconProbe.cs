@@ -49,7 +49,7 @@ public static class IconProbe
         return path;
     }
 
-    private static byte[] DrawWitness(int size)
+    internal static byte[] DrawWitness(int size)
     {
         var px = new byte[size * size * 4];
         int thickness = Math.Max(1, size / 8);

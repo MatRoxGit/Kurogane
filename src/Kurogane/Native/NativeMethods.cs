@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
 namespace Kurogane.Native;
 
@@ -40,6 +40,21 @@ internal static class NativeMethods
 
     [DllImport("shell32.dll")]
     private static extern void SHChangeNotify(int eventId, uint flags, IntPtr item1, IntPtr item2);
+
+    private const uint MOVEFILE_DELAY_UNTIL_REBOOT = 0x00000004;
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode,
+               EntryPoint = "MoveFileExW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool MoveFileEx(string existant, string? nouveau, uint flags);
+
+    /// <summary>
+    /// Programme la suppression d'un fichier au prochain démarrage. Seule
+    /// façon de se débarrasser d'un fichier que le shell a encore mappé.
+    /// Demande les droits administrateur.
+    /// </summary>
+    internal static bool SupprimerAuRedemarrage(string chemin) =>
+        MoveFileEx(chemin, null, MOVEFILE_DELAY_UNTIL_REBOOT);
 
     /// <summary>Applique le fond d'écran. Le chemin doit être absolu.</summary>
     internal static bool SetWallpaper(string absolutePath) =>

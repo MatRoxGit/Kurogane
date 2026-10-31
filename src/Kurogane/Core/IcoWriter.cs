@@ -63,7 +63,7 @@ public static class IcoWriter
     /// deux bitmaps dans une seule image. Oublier ce doublement produit un
     /// fichier que Windows accepte mais affiche coupe en deux.
     /// </summary>
-    private static byte[] BuildDib(int size, byte[] bgraTopDown)
+    internal static byte[] BuildDib(int size, byte[] bgraTopDown)
     {
         int maskStride = (size + 31) / 32 * 4;   // 1 bit par pixel, lignes alignees sur 4 octets
         int xorBytes = size * size * 4;
