@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="256" height="256" color="#C8102E" fill="none" stroke="#C8102E" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter">
+    <style>.k-accent { fill: #C8102E; fill-opacity: 0.22; }</style>
+    <circle cx="32" cy="32" r="22" />
+    <path d="M13.5 16.5A25 25 0 0 1 50.5 16.5" />
+    <path d="M32 4v4M4 32h4M56 32h4M32 56v4" />
+    <polygon class="k-accent" points="19,18 24,18 24,25.5 19,31" />
+    <polygon class="k-accent" points="19,33 24,38.5 24,46 19,46" />
+    <polygon class="k-accent" points="21,32 32.5,18 38,18 26.5,32 38,46 32.5,46" />
+    <polygon class="k-accent" points="29.5,32 41,18 46.5,18 35,32 46.5,46 41,46" />
+</svg>

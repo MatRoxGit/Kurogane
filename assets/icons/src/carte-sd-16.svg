@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges" color="#C8102E" fill="#C8102E" stroke="none">
+    <style>.k-accent { fill: #C8102E; fill-opacity: 0.28; }</style>
+    <path fill-rule="evenodd" d="M6,2 H12 V14 H4 V4 Z M7,3 L5,5 V13 H11 V3 Z" />
+    <rect x="7" y="4" width="1" height="2" />
+    <rect x="9" y="4" width="1" height="2" />
+    <path fill-rule="evenodd" d="M6,8 H10 V13 H6 Z M7,9 V12 H9 V9 Z" />
+</svg>

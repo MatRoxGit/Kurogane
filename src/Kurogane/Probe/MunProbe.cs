@@ -50,12 +50,14 @@ internal static class MunProbe
 
         var fiches = new List<Fiche>();
 
-        foreach (var nom in Binaires)
-        {
-            if (filtre is not null &&
-                !nom.Equals(filtre, StringComparison.OrdinalIgnoreCase))
-                continue;
+        // Sans filtre : les trois bibliothèques du shell. Avec un filtre : ce
+        // qu'on demande, même hors de cette liste — un nom de binaire ou un
+        // chemin complet. De quoi fouiller explorer.exe ou twinui sans
+        // toucher au code.
+        var aSonder = filtre is null ? Binaires : new[] { filtre };
 
+        foreach (var nom in aSonder)
+        {
             var fiche = Sonder(nom, racine, journal);
             if (fiche is not null) fiches.Add(fiche);
             journal.Blank();
@@ -94,11 +96,17 @@ internal static class MunProbe
         // Le fichier .mun est la source depuis 1903 ; le .dll System32 reste
         // le bon emplacement sur les versions antérieures.
         string windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-        string[] candidats =
-        {
-            Path.Combine(windows, "SystemResources", $"{nom}.dll.mun"),
-            Path.Combine(windows, "System32", $"{nom}.dll"),
-        };
+
+        string[] candidats = nom.Contains('\\') || nom.Contains('/')
+            ? new[] { nom }                     // chemin complet fourni tel quel
+            : new[]
+            {
+                Path.Combine(windows, "SystemResources", $"{nom}.dll.mun"),
+                Path.Combine(windows, "SystemResources", $"{nom}.exe.mun"),
+                Path.Combine(windows, "System32", $"{nom}.dll"),
+                Path.Combine(windows, "System32", $"{nom}.exe"),
+                Path.Combine(windows, $"{nom}.exe"),
+            };
 
         foreach (string chemin in candidats)
         {
@@ -124,7 +132,8 @@ internal static class MunProbe
             journal.Info($"version {version} — modifié le {modifie:dd/MM/yyyy}");
             journal.Ok($"{ids.Count} groupes d'icônes");
 
-            string dossier = Path.Combine(racine, nom);
+            string dossier = Path.Combine(racine,
+                Path.GetFileName(nom).Replace(".", "_"));
             Directory.CreateDirectory(dossier);
 
             var extraites = new List<(int, string, int)>();
@@ -268,7 +277,7 @@ internal static class MunProbe
             {
                 sb.Append($"""
                       <div class="case">
-                        <img src="{f.Nom}/{fichier}" alt="{id}" loading="lazy">
+                        <img src="{Path.GetFileName(f.Nom).Replace(".", "_")}/{fichier}" alt="{id}" loading="lazy">
                         <div class="id">{id}</div>
                         <div class="n">{tailles} tailles</div>
                       </div>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="256" height="256" color="#C8102E" fill="none" stroke="#C8102E" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter">
+    <style>.k-accent { fill: #C8102E; fill-opacity: 0.22; }</style>
+    <polygon points="26,9 38,9 41,15 47,18 53,15 55,24 49,29 49,35 55,40 53,49 47,46 41,49 38,55 26,55 23,49 17,46 11,49 9,40 15,35 15,29 9,24 11,15 17,18 23,15" />
+    <circle cx="32" cy="32" r="10" />
+    <polyline class="k-accent" points="35,27 29,32 35,37" />
+</svg>

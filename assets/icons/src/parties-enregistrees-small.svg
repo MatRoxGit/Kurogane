@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" shape-rendering="crispEdges" color="#C8102E" fill="none" stroke="#C8102E" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter">
+    <style>.k-accent { fill: #C8102E; fill-opacity: 0.28; }</style>
+    <polygon class="k-accent" points="4,7 20,7 21,17 16,17 14,14 10,14 8,17 3,17" />
+    <path d="M8 10v4M6 12h4M16 11h2" />
+</svg>

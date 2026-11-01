@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges" color="#C8102E" fill="#C8102E" stroke="none">
+    <style>.k-accent { fill: #C8102E; fill-opacity: 0.28; }</style>
+    <rect x="2" y="2" width="12" height="2" />
+    <rect x="2" y="4" width="2" height="4" />
+    <rect x="12" y="4" width="2" height="4" />
+    <rect x="1" y="8" width="4" height="6" />
+    <rect x="11" y="8" width="4" height="6" />
+</svg>

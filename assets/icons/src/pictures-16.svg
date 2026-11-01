@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges" color="#C8102E" fill="#C8102E" stroke="none">
+    <style>.k-accent { fill: #C8102E; fill-opacity: 0.28; }</style>
+    <path fill-rule="evenodd" d="M1,2 H15 V14 H1 Z M2,3 V13 H14 V3 Z" />
+    <rect x="4" y="5" width="2" height="2" />
+    <polygon points="2,13 6,9 9,11 12,8 14,10 14,13" />
+</svg>

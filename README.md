@@ -3,7 +3,7 @@
 Personnalisation visuelle de Windows 11, entièrement réversible.
 
 Kurogane applique un thème décrit dans un fichier JSON — mode sombre, couleur
-d'accent, fond d'écran, icônes du shell.
+d'accent, fond d'écran, icônes du shell, barre des tâches et menu Démarrer.
 
 **L'application d'un thème ne touche à aucun fichier système** : uniquement des
 clés de registre et des `desktop.ini`. Une commande distincte, qui n'est
@@ -99,6 +99,19 @@ l'élévation ne la garantissant pas.
     "style": "fill"
   },
 
+  "taskbar": {
+    "alignment": "left",
+    "size": "small",
+    "search": "icon",
+    "combineButtons": "always",
+    "secondsInClock": true
+  },
+
+  "startMenu": {
+    "layout": "morePins",
+    "recentFiles": false
+  },
+
   "icons": {
     "directory": "../assets/icons",
     "cePc": "ce-pc.ico",
@@ -137,6 +150,7 @@ src/Kurogane/
 │   ├── MunPatcher.cs        Plan de substitution d'un groupe d'icônes
 │   ├── SourceIco.cs         Images d'un .ico à la taille demandée
 │   ├── IcoReader.cs         Lecture de .ico, décodage des bitmaps 32 bits
+│   ├── Shell.cs             Redémarrage de l'Explorateur
 │   ├── PngWriter.cs         Encodeur PNG sans dépendance (ZLibStream)
 │   ├── Snapshot.cs          Point de restauration (write-ahead, écriture atomique)
 │   ├── Journal.cs           Journal console + fichier
@@ -151,10 +165,12 @@ src/Kurogane/
 │   ├── WallpaperModule.cs
 │   ├── DesktopIconsModule.cs    Icônes du Bureau            (HKCU)
 │   ├── SpecialFoldersModule.cs  Dossiers du profil          (desktop.ini)
-│   └── ShellIconsModule.cs      Dossier, lecteur, raccourci (HKLM)
+│   ├── ShellIconsModule.cs      Dossier, lecteur, raccourci (HKLM)
+│   └── TaskbarModule.cs         Barre des tâches, menu Démarrer (HKCU)
 ├── Probe/
 │   ├── IconProbe.cs         Diagnostic : quelles cibles répondent
 │   ├── OwnershipProbe.cs    Diagnostic : clés protégées
+│   ├── TaskbarProbe.cs      Inventaire de la barre des tâches (lecture seule)
 │   ├── MunProbe.cs          Catalogue des icônes système (lecture seule)
 │   ├── MunWriteProbe.cs     Validation du graveur sur copie, contrôle d'intégrité
 │   └── MunSubstitution.cs   Substitution réelle, sauvegarde et garde-fou
@@ -273,10 +289,25 @@ corrigeables, seulement annoncées.
 
 ## État
 
-v0.6.0 — mode sombre, accent, fond d'écran, et 15 icônes réparties sur trois
-mécanismes : registre utilisateur, registre machine, `desktop.ini`. Plus, en
-commande séparée, la substitution de ressources dans `imageres.dll.mun` pour
-les cinq entrées de l'Accès rapide.
+v0.8.3 — mode sombre, accent, fond d'écran, 15 icônes réparties sur trois
+mécanismes (registre utilisateur, registre machine, `desktop.ini`), barre des
+tâches et menu Démarrer. Plus, en commande séparée, la substitution de
+ressources dans `imageres.dll.mun` pour les cinq entrées de l'Accès rapide.
+
+### Deux limites constatées, non contournables
+
+**Les widgets de la barre des tâches.** `TaskbarDa` est intercepté au niveau
+du noyau par le *User Choice Protection Driver* (`ucpd.sys`), introduit par
+Microsoft en 2024. Aucune élévation ne passe outre, et la stratégie de
+remplacement est bloquée elle aussi. Le réglage reste accepté dans un thème,
+pour une installation sans UCPD, mais n'est pas livré par défaut : écrire une
+valeur sans pouvoir la défaire contredirait la garantie centrale du projet.
+
+**L'icône du bouton Démarrer.** Sondé : `twinui.pcshell.dll` ne contient
+aucune icône PE, et les 27 groupes d'`explorer.exe` sont des vestiges de
+Windows 7 et 8. La barre des tâches de Windows 11 est dessinée en XAML. Les
+outils qui y parviennent injectent du code dans le processus du shell — ni
+réversible, ni compatible avec ce projet.
 
 Dette technique à régler avant tout empaquetage : les chemins d'icônes écrits
 dans le registre et dans les `desktop.ini` sont absolus et pointent vers le

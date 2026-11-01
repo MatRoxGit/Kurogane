@@ -13,6 +13,8 @@ public sealed class ThemeDefinition
     public AccentSection?   Accent   { get; set; }
     public WallpaperSection? Wallpaper { get; set; }
     public IconsSection?    Icons     { get; set; }
+    public TaskbarSection?  Taskbar   { get; set; }
+    public StartMenuSection? StartMenu { get; set; }
 
     /// <summary>Dossier d'où le thème a été chargé — sert à résoudre les chemins relatifs.</summary>
     [JsonIgnore]
@@ -79,6 +81,41 @@ public sealed class WallpaperSection
 
     /// <summary>fill | fit | stretch | center | tile | span</summary>
     public string Style { get; set; } = "fill";
+}
+
+public sealed class TaskbarSection
+{
+    /// <summary>« left » ou « center ». Absent : inchangé.</summary>
+    public string? Alignment { get; set; }
+
+    /// <summary>« small », « medium » ou « large ».</summary>
+    public string? Size { get; set; }
+
+    /// <summary>« hidden », « icon », « box » ou « boxLabel ».</summary>
+    public string? Search { get; set; }
+
+    public bool? Widgets { get; set; }
+    public bool? Chat { get; set; }
+    public bool? TaskView { get; set; }
+
+    /// <summary>« always », « whenFull » ou « never ».</summary>
+    public string? CombineButtons { get; set; }
+
+    public bool? SecondsInClock { get; set; }
+    public bool? Animations { get; set; }
+
+    /// <summary>Masquage automatique : un seul bit dans un blob binaire.</summary>
+    public bool? AutoHide { get; set; }
+}
+
+public sealed class StartMenuSection
+{
+    /// <summary>« default », « morePins » ou « moreRecommendations ».</summary>
+    public string? Layout { get; set; }
+
+    public bool? RecentFiles { get; set; }
+    public bool? RecentApps { get; set; }
+    public bool? AccountNotifications { get; set; }
 }
 
 public sealed class IconsSection

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="256" height="256" color="#C8102E" fill="none" stroke="#C8102E" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter">
+    <style>.k-accent { fill: #C8102E; fill-opacity: 0.22; }</style>
+    <path d="M12 16h40" />
+    <polyline points="23,16 26,10 38,10 41,16" />
+    <polygon points="16,16 48,16 45,50 40,54 24,54 19,50" />
+    <path d="M26 24v22M32 24v22M38 24v22" />
+</svg>

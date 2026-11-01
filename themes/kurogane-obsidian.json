@@ -1,6 +1,6 @@
 {
   "name": "Kurogane Obsidian",
-  "version": "0.3.1",
+  "version": "0.4.1",
   "author": "Mathieu",
   "darkMode": {
     "apps": true,
@@ -15,6 +15,23 @@
   "wallpaper": {
     "path": "../assets/wallpapers/Wallpaper_Kurogane.jpg",
     "style": "fill"
+  },
+  "taskbar": {
+    "alignment": "left",
+    "size": "small",
+    "search": "icon",
+    "chat": false,
+    "taskView": true,
+    "combineButtons": "always",
+    "secondsInClock": true,
+    "animations": true,
+    "autoHide": false
+  },
+  "startMenu": {
+    "layout": "morePins",
+    "recentFiles": false,
+    "recentApps": false,
+    "accountNotifications": false
   },
   "icons": {
     "directory": "../assets/icons",

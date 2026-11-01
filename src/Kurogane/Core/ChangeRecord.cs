@@ -1,5 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 
+using System.Text.RegularExpressions;
+
 namespace Kurogane.Core;
 
 /// <summary>Nature de la chose modifiee.</summary>
@@ -55,9 +57,35 @@ public sealed class ChangeRecord
     public bool IsNoOp =>
         Existed
         && string.Equals(OriginalValueKind, NewValueKind, StringComparison.Ordinal)
-        && string.Equals(OriginalValue, NewValue, StringComparison.Ordinal)
+        && ValeursEquivalentes(OriginalValue, NewValue)
         && (NewAttributes is null
             || string.Equals(OriginalAttributes, NewAttributes, StringComparison.Ordinal));
+
+    private static readonly Regex CheminWindows = new(@"[A-Za-z]:\\", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Compare deux valeurs, en tenant compte du fait qu'un chemin de fichier
+    /// sous Windows ne distingue pas la casse : « C:\kurogane\x.ico » et
+    /// « C:\Kurogane\x.ico » désignent le même fichier.
+    ///
+    /// Sans cette nuance, renommer le dossier du projet avec une majuscule
+    /// produit une modification fantôme par icône — rien n'est réellement
+    /// changé, mais le point de restauration enfle et le plan devient
+    /// illisible.
+    ///
+    /// La tolérance est volontairement étroite : elle ne s'applique que si les
+    /// DEUX valeurs contiennent un chemin absolu. Partout ailleurs, la
+    /// comparaison reste octet pour octet.
+    /// </summary>
+    private static bool ValeursEquivalentes(string? avant, string? apres)
+    {
+        if (string.Equals(avant, apres, StringComparison.Ordinal)) return true;
+        if (avant is null || apres is null) return false;
+
+        if (!CheminWindows.IsMatch(avant) || !CheminWindows.IsMatch(apres)) return false;
+
+        return string.Equals(avant, apres, StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>Rendu lisible pour le plan et le journal.</summary>
     public string Render()

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="256" height="256" color="#C8102E" fill="none" stroke="#C8102E" stroke-width="1.6" stroke-linecap="square" stroke-linejoin="miter">
+    <style>.k-accent { fill: #C8102E; fill-opacity: 0.22; }</style>
+    <polyline points="8,30 32,8 56,30" />
+    <polygon points="14,26 50,26 50,54 14,54" />
+    <rect class="k-accent" x="26" y="36" width="12" height="18" />
+</svg>

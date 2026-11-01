@@ -7,7 +7,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.6.0";
+    private const string Version = "0.8.3";
 
     private static readonly IThemeModule[] Modules =
     {
@@ -17,6 +17,7 @@ internal static class Program
         new DesktopIconsModule(),
         new SpecialFoldersModule(),
         new ShellIconsModule(),
+        new TaskbarModule(),
     };
 
     private static int Main(string[] args)
@@ -36,6 +37,7 @@ internal static class Program
                 "probe-icons" => CmdProbe(args),
                 "probe-ownership" => CmdProbeOwnership(args),
                 "probe-mun" => CmdProbeMun(args),
+                "probe-taskbar" => CmdProbeTaskbar(),
                 "probe-mun-ecriture" => CmdProbeMunEcriture(args),
                 "substituer-mun" => CmdSubstituerMun(args),
                 "restaurer-mun" => CmdRestaurerMun(args),
@@ -283,6 +285,14 @@ internal static class Program
         return MunProbe.Executer(journal, Flag(args, "--binaire"));
     }
 
+    // --------------------------------------------------------- probe-taskbar
+
+    private static int CmdProbeTaskbar()
+    {
+        using var journal = new Journal("probe-taskbar");
+        return TaskbarProbe.Executer(journal);
+    }
+
     // --------------------------------------------- probe-mun-ecriture (A)
 
     /// <summary>
@@ -472,7 +482,32 @@ internal static class Program
         }
         catch (Exception ex)
         {
-            journal.Error($"Échec à la modification {applied + 1} : {ex.Message}");
+            // Nommer la cible, pas seulement son rang : un numéro oblige à
+            // recompter le plan à la main pour savoir ce qui a échoué.
+            var fautive = applied < pending.Count ? pending[applied].Item : null;
+
+            journal.Error($"Échec à la modification {applied + 1} sur {pending.Count}");
+
+            if (fautive is not null)
+            {
+                journal.Error($"  module      : {fautive.Group} (niveau {fautive.Level})");
+                journal.Error($"  cible       : {fautive.Change.Target}");
+                journal.Error($"  description : {fautive.Change.Description}");
+            }
+
+            journal.Error($"  {ex.GetType().Name} : {ex.Message}");
+
+            if (ex is UnauthorizedAccessException && fautive is not null
+                && fautive.Change.Target.StartsWith("HKCU", StringComparison.Ordinal))
+            {
+                journal.Blank();
+                journal.Info("Un refus de droits sur HKCU est inhabituel : la ruche");
+                journal.Info("appartient à l'utilisateur. Certaines valeurs sont");
+                journal.Info("interceptées au niveau du noyau par le User Choice");
+                journal.Info("Protection Driver (ucpd.sys), que Microsoft a introduit");
+                journal.Info("en 2024. Aucune élévation ne contourne ce blocage.");
+                journal.Info("Retire le réglage concerné du fichier de thème.");
+            }
             journal.Step("Retour arrière automatique");
 
             for (int i = applied - 1; i >= 0; i--)
@@ -623,7 +658,12 @@ internal static class Program
                   alors rien à modifier, mais le cache du shell est périmé.
                   --purge ferme l'Explorateur et supprime ses bases de cache.
 
-              probe-mun [--binaire <nom>]
+              probe-taskbar
+                  Inventaire en lecture seule de la barre des tâches et du
+                  menu Démarrer : ce qui existe sur cette version de Windows,
+                  ce que ça vaut, et ce qui est absent. Rien n'est écrit.
+
+              probe-mun [--binaire <nom ou chemin>]
                   Catalogue les icônes stockées dans imageres.dll.mun,
                   shell32.dll.mun et ddores.dll.mun. Extrait un .ico par
                   groupe et produit une planche de contact HTML indexée par
