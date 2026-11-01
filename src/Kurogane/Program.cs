@@ -8,7 +8,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.11.4";
+    private const string Version = "0.12.0";
 
     private static readonly IThemeModule[] Modules =
     {

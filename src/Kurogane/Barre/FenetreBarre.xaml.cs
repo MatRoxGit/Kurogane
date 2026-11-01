@@ -16,6 +16,14 @@ public partial class FenetreBarre : Window
     private readonly ThemeDefinition _theme;
     private readonly Journal _journal;
     private DispatcherTimer? _horloge;
+    private DispatcherTimer? _veilleFenetres;
+
+    /// <summary>
+    /// Boutons déjà affichés, indexés par fenêtre. On réconcilie plutôt que
+    /// de reconstruire : rebâtir la liste chaque seconde ferait scintiller
+    /// la barre et annulerait le survol en cours.
+    /// </summary>
+    private readonly Dictionary<IntPtr, Button> _boutons = new();
 
     public FenetreBarre(ThemeDefinition theme, BarreSection config, Journal journal)
     {
@@ -44,8 +52,17 @@ public partial class FenetreBarre : Window
                 AppBarNative.WS_EX_TOOLWINDOW | AppBarNative.WS_EX_NOACTIVATE);
         };
 
-        Loaded += (_, _) => DemarrerHorloge();
-        Closed += (_, _) => _horloge?.Stop();
+        Loaded += (_, _) =>
+        {
+            DemarrerHorloge();
+            DemarrerVeilleFenetres();
+        };
+
+        Closed += (_, _) =>
+        {
+            _horloge?.Stop();
+            _veilleFenetres?.Stop();
+        };
     }
 
     private void DemarrerHorloge()
@@ -64,6 +81,102 @@ public partial class FenetreBarre : Window
         _horloge = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _horloge.Tick += (_, _) => Battre();
         _horloge.Start();
+    }
+
+    // ------------------------------------------------------------------
+    //  Fenêtres ouvertes
+    // ------------------------------------------------------------------
+
+    private void DemarrerVeilleFenetres()
+    {
+        Rafraichir();
+
+        _veilleFenetres = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+        _veilleFenetres.Tick += (_, _) => Rafraichir();
+        _veilleFenetres.Start();
+    }
+
+    private void Rafraichir()
+    {
+        var moi = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        var ouvertes = FenetresOuvertes.Lister(moi);
+        var vues = new HashSet<IntPtr>();
+
+        foreach (var f in ouvertes)
+        {
+            vues.Add(f.Hwnd);
+
+            if (_boutons.TryGetValue(f.Hwnd, out var existant))
+            {
+                // Seul le titre change en cours de vie : un onglet, un
+                // document. On met à jour sans recréer le bouton.
+                if (existant.ToolTip as string != f.Titre)
+                {
+                    existant.ToolTip = f.Titre;
+                    if (existant.Content is StackPanel pile
+                        && pile.Children.Count > 0
+                        && pile.Children[^1] is TextBlock texte)
+                        texte.Text = Abreger(f.Titre);
+                }
+                continue;
+            }
+
+            var bouton = new Button
+            {
+                Style   = (Style)FindResource("Cellule"),
+                Height  = 38,
+                Padding = new Thickness(8, 0, 8, 0),
+                ToolTip = f.Titre,
+                HorizontalContentAlignment = HorizontalAlignment.Left,
+                Content = ContenuFenetre(f),
+            };
+
+            var cible = f.Hwnd;
+            bouton.Click += (_, _) => FenetresOuvertes.Activer(cible);
+
+            _boutons[f.Hwnd] = bouton;
+            Fenetres.Children.Add(bouton);
+        }
+
+        foreach (var disparue in _boutons.Keys.Where(h => !vues.Contains(h)).ToList())
+        {
+            Fenetres.Children.Remove(_boutons[disparue]);
+            _boutons.Remove(disparue);
+        }
+
+        Separateur.Visibility = _boutons.Count > 0 && Epingles.Children.Count > 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private static string Abreger(string titre) =>
+        titre.Length <= 22 ? titre : titre[..21] + "…";
+
+    private object ContenuFenetre(FenetresOuvertes.Entree f)
+    {
+        var pile = new StackPanel { Orientation = Orientation.Horizontal };
+
+        if (f.Icone is not null)
+            pile.Children.Add(new Image
+            {
+                Source  = f.Icone,
+                Width   = 18,
+                Height  = 18,
+                Margin  = new Thickness(0, 0, 8, 0),
+                Stretch = Stretch.Uniform,
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+
+        pile.Children.Add(new TextBlock
+        {
+            Text       = Abreger(f.Titre),
+            Foreground = (Brush)FindResource("TexteVif"),
+            FontFamily = (FontFamily)FindResource("Mono"),
+            FontSize   = 10,
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+
+        return pile;
     }
 
     private void RemplirEpingles()

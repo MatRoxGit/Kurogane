@@ -117,9 +117,15 @@
                 </StackPanel>
             </Border>
 
-            <!-- Applications épinglées, remplies depuis le thème -->
-            <StackPanel x:Name="Epingles" Grid.Column="2" Orientation="Horizontal"
-                        HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <!-- Épingles du thème, puis fenêtres ouvertes -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel x:Name="Epingles" Orientation="Horizontal" />
+                <Border x:Name="Separateur" Width="1" Margin="10,8"
+                        Background="{DynamicResource Rouge}" Opacity="0.45"
+                        Visibility="Collapsed" />
+                <StackPanel x:Name="Fenetres" Orientation="Horizontal" />
+            </StackPanel>
 
             <!-- Horloge -->
             <Border Grid.Column="3" Padding="10,3" VerticalAlignment="Center"
