@@ -30,14 +30,26 @@ public static class TaskbarStyle
     private const string ClassePrincipale = "Shell_TrayWnd";
     private const string ClasseSecondaire = "Shell_SecondaryTrayWnd";
 
-    public static int Appliquer(Journal journal, Reglage r)
+    /// <param name="silencieux">
+    /// Réduit le journal à une ligne. Le compagnon résident repose le style
+    /// plusieurs fois par session : le détail complet à chaque fois noierait
+    /// les événements qui comptent.
+    /// </param>
+    public static int Appliquer(Journal journal, Reglage r, bool silencieux = false)
     {
-        journal.Step("Restylage de la barre des tâches");
-        journal.Info("Aucune écriture : l'effet porte sur la fenêtre vivante.");
-        journal.Blank();
+        if (!silencieux)
+        {
+            journal.Step("Restylage de la barre des tâches");
+            journal.Info("Aucune écriture : l'effet porte sur la fenêtre vivante.");
+            journal.Blank();
+        }
 
         var barres = Barres();
-        if (barres.Count == 0) { journal.Error("Aucune barre des tâches trouvée."); return 1; }
+        if (barres.Count == 0)
+        {
+            journal.Error("Aucune barre des tâches trouvée.");
+            return 1;
+        }
 
         foreach (var (hwnd, classe) in barres)
         {
@@ -50,7 +62,7 @@ public static class TaskbarStyle
             int largeur = rect.Right - rect.Left;
             int hauteur = rect.Bottom - rect.Top;
 
-            journal.Step($"{classe}   {largeur}×{hauteur}");
+            if (!silencieux) journal.Step($"{classe}   {largeur}×{hauteur}");
 
             // --- Découpage : la région est en coordonnées de la fenêtre.
             //     Découper le parent découpe aussi ses enfants, pont XAML
@@ -76,6 +88,8 @@ public static class TaskbarStyle
                         journal.Error("pose de la région refusée");
                         WindowStyleNative.DeleteObject(region);
                     }
+                    else if (silencieux)
+                        journal.Ok($"style reposé — {largeur - 2 * l}×{hauteur - 2 * h}");
                     else
                         journal.Ok($"barre flottante : {largeur - 2 * l}×{hauteur - 2 * h}, "
                                  + $"rayon {r.Rayon}");
@@ -94,21 +108,58 @@ public static class TaskbarStyle
                     ? WindowStyleNative.Accent.Acrylique
                     : WindowStyleNative.Accent.DegradeTransparent;
 
-                if (WindowStyleNative.PoserAccent(hwnd, etat, abgr))
+                // Le pont XAML peint un fond opaque par-dessus la fenêtre
+                // parente : teinter le parent seul ne se voit pas. Mesuré le
+                // 01/11/2026 — la barre restait uniformément (27,27,27)
+                // alors que le fond d'écran variait derrière.
+                //
+                // On applique donc la composition aux deux, parent et pont.
+                int poses = 0;
+
+                if (WindowStyleNative.PoserAccent(hwnd, etat, abgr)) poses++;
+
+                var pont = WindowNative.FindWindowEx(hwnd, IntPtr.Zero,
+                    "Windows.UI.Composition.DesktopWindowContentBridge", null);
+
+                if (pont != IntPtr.Zero && WindowStyleNative.PoserAccent(pont, etat, abgr))
+                    poses++;
+
+                bool pontTeinte = poses == 2;
+
+                if (poses > 0 && !silencieux)
+                {
                     journal.Ok($"teinte {couleur} à {r.Opacite * 100 / 255} % "
-                             + $"({(r.Acrylique ? "acrylique" : "dégradé")})");
-                else
+                             + $"({(r.Acrylique ? "acrylique" : "dégradé")}) — "
+                             + $"{poses} fenêtre(s) sur 2");
+
+                    // Mesuré le 01/11/2026 sur Windows 11 22H2 : sans le pont,
+                    // la barre reste parfaitement opaque — (28,28,28) sur toute
+                    // sa largeur alors que le fond d'écran varie derrière. Le
+                    // fond est peint par le compositeur XAML, à une couche où
+                    // l'attribut n'a plus prise. Autant le dire franchement
+                    // plutôt que de laisser croire à un succès.
+                    if (!pontTeinte)
+                    {
+                        journal.Warn("le pont XAML a refusé la composition : la teinte");
+                        journal.Warn("n'aura très probablement aucun effet visible.");
+                        journal.Info("Sur Windows 11, la couleur de la barre suit l'accent");
+                        journal.Info("du système — section « accent », taskbarAndStart.");
+                    }
+                }
+                if (poses == 0)
                     journal.Warn("teinte refusée — SetWindowCompositionAttribute n'est pas "
                                + "documenté, l'échec est une réponse possible");
             }
 
-            journal.Blank();
+            if (!silencieux) journal.Blank();
         }
+
+        if (silencieux) return 0;
 
         journal.Step("Portée de l'effet");
         journal.Info("Il ne survit pas à un redémarrage d'explorer, ni à un changement");
-        journal.Info("de résolution. Pour le rendre permanent il faudra un compagnon");
-        journal.Info("résident qui le repose sur l'événement TaskbarCreated.");
+        journal.Info("de résolution. Pour qu'il tienne, lance le compagnon résident :");
+        journal.Info("  kurogane resident --theme themes\\kurogane-obsidian.json");
         journal.Blank();
         journal.Info("Pour tout défaire : kurogane taskbar-style --reinitialiser");
 

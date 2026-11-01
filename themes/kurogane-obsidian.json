@@ -1,6 +1,6 @@
 {
   "name": "Kurogane Obsidian",
-  "version": "0.4.1",
+  "version": "0.6.0",
   "author": "Mathieu",
   "darkMode": {
     "apps": true,
@@ -32,6 +32,53 @@
     "recentFiles": false,
     "recentApps": false,
     "accountNotifications": false
+  },
+  "taskbarStyle": {
+    "marge": 12,
+    "margeBasse": 6,
+    "rayon": 10,
+    "teinte": "#C8102E",
+    "opacite": 180,
+    "acrylique": true
+  },
+  "barre": {
+    "noeud": "SYS.NODE // 01",
+    "etat": "SEC.ONLINE",
+    "suffixeDate": "KRG",
+    "epingles": [
+      {
+        "libelle": "EXPLORATEUR",
+        "commande": "explorer.exe",
+        "icone": "dossier.ico"
+      },
+      {
+        "libelle": "TERMINAL",
+        "commande": "powershell.exe",
+        "icone": "terminal.ico"
+      },
+      {
+        "libelle": "CODE",
+        "commande": "code",
+        "icone": "code.ico"
+      },
+      {
+        "libelle": "PARAMETRES",
+        "commande": "ms-settings:",
+        "icone": "panneau-configuration.ico"
+      },
+      {
+        "libelle": "CE PC",
+        "commande": "explorer.exe",
+        "arguments": "shell:MyComputerFolder",
+        "icone": "ce-pc.ico"
+      },
+      {
+        "libelle": "RESEAU",
+        "commande": "explorer.exe",
+        "arguments": "shell:NetworkPlacesFolder",
+        "icone": "reseau.ico"
+      }
+    ]
   },
   "icons": {
     "directory": "../assets/icons",

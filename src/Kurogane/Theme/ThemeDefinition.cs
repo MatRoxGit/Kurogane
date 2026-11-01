@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.IO;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Kurogane.Theme;
@@ -15,6 +16,8 @@ public sealed class ThemeDefinition
     public IconsSection?    Icons     { get; set; }
     public TaskbarSection?  Taskbar   { get; set; }
     public StartMenuSection? StartMenu { get; set; }
+    public TaskbarStyleSection? TaskbarStyle { get; set; }
+    public BarreSection?    Barre     { get; set; }
 
     /// <summary>Dossier d'où le thème a été chargé — sert à résoudre les chemins relatifs.</summary>
     [JsonIgnore]
@@ -106,6 +109,65 @@ public sealed class TaskbarSection
 
     /// <summary>Masquage automatique : un seul bit dans un blob binaire.</summary>
     public bool? AutoHide { get; set; }
+}
+
+/// <summary>
+/// Restylage à chaud de la barre : barre flottante et teinte. Ces réglages
+/// ne sont pas appliqués par « apply » — ils n'écrivent rien et ne durent
+/// que le temps où le compagnon résident tourne.
+/// </summary>
+/// <summary>Une application épinglée dans la barre Kurogane.</summary>
+public sealed class EpingleBarre
+{
+    /// <summary>Texte de l'info-bulle, et repli si l'icône manque.</summary>
+    public string? Libelle { get; set; }
+
+    /// <summary>Exécutable ou document à ouvrir.</summary>
+    public string? Commande { get; set; }
+
+    public string? Arguments { get; set; }
+
+    /// <summary>Nom de fichier .ico, résolu dans le dossier d'icônes du thème.</summary>
+    public string? Icone { get; set; }
+}
+
+/// <summary>
+/// La barre des tâches Kurogane, qui remplace celle de Windows pendant
+/// qu'elle tourne. Rien n'est écrit : c'est une fenêtre, pas un réglage.
+/// </summary>
+public sealed class BarreSection
+{
+    /// <summary>Première ligne du bloc d'état.</summary>
+    public string? Noeud { get; set; }
+
+    /// <summary>Seconde ligne du bloc d'état.</summary>
+    public string? Etat { get; set; }
+
+    /// <summary>Suffixe affiché après la date, par exemple « KRG ».</summary>
+    public string? SuffixeDate { get; set; }
+
+    public List<EpingleBarre>? Epingles { get; set; }
+}
+
+public sealed class TaskbarStyleSection
+{
+    /// <summary>Marge latérale en pixels. Au-delà d'une douzaine, le contenu est rogné.</summary>
+    public int? Marge { get; set; }
+
+    /// <summary>Marge haute et basse en pixels.</summary>
+    public int? MargeBasse { get; set; }
+
+    /// <summary>Rayon des coins en pixels.</summary>
+    public int? Rayon { get; set; }
+
+    /// <summary>Couleur de teinte, au format #RRGGBB. Absente : aucune teinte.</summary>
+    public string? Teinte { get; set; }
+
+    /// <summary>Opacité de la teinte, de 0 à 255.</summary>
+    public int? Opacite { get; set; }
+
+    /// <summary>Flou acrylique plutôt qu'un dégradé net.</summary>
+    public bool? Acrylique { get; set; }
 }
 
 public sealed class StartMenuSection

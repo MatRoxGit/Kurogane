@@ -1,4 +1,5 @@
-﻿using Kurogane.Core;
+﻿using System.IO;
+using Kurogane.Core;
 using Kurogane.Native;
 using Kurogane.Theme;
 using Microsoft.Win32;

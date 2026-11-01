@@ -1,4 +1,5 @@
-﻿using Kurogane.Core;
+﻿using System.IO;
+using Kurogane.Core;
 using Kurogane.Modules;
 using Kurogane.Probe;
 using Kurogane.Theme;
@@ -7,7 +8,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.9.2";
+    private const string Version = "0.11.4";
 
     private static readonly IThemeModule[] Modules =
     {
@@ -20,6 +21,7 @@ internal static class Program
         new TaskbarModule(),
     };
 
+    [STAThread]
     private static int Main(string[] args)
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -45,6 +47,8 @@ internal static class Program
                 "probe-taskbar" => CmdProbeTaskbar(),
                 "probe-taskbar-fenetres" => CmdProbeTaskbarFenetres(),
                 "taskbar-style" => CmdTaskbarStyle(args),
+                "resident" => CmdResident(args),
+                "barre" => CmdBarre(args),
                 "probe-mun-ecriture" => CmdProbeMunEcriture(args),
                 "substituer-mun" => CmdSubstituerMun(args),
                 "restaurer-mun" => CmdRestaurerMun(args),
@@ -316,23 +320,79 @@ internal static class Program
 
         if (Has(args, "--reinitialiser")) return TaskbarStyle.Reinitialiser(journal);
 
-        int Nombre(string nom, int defaut)
+        return TaskbarStyle.Appliquer(journal, Reglage(args, journal));
+    }
+
+    /// <summary>
+    /// Compagnon résident. Occupe le terminal jusqu'à Ctrl+C, et retire le
+    /// style en partant.
+    /// </summary>
+    private static int CmdResident(string[] args)
+    {
+        using var journal = new Journal("resident");
+        return TaskbarResident.Executer(journal, Reglage(args, journal));
+    }
+
+    /// <summary>
+    /// Barre des tâches Kurogane. Masque celle de Windows le temps qu'elle
+    /// tourne, et la rend en partant. Rien n'est écrit.
+    /// </summary>
+    private static int CmdBarre(string[] args)
+    {
+        string? chemin = Flag(args, "--theme");
+
+        if (chemin is null)
         {
-            string? brut = Flag(args, nom);
-            return brut is not null && int.TryParse(brut, out int n) ? n : defaut;
+            Console.Error.WriteLine("Usage : kurogane barre --theme <fichier.json>");
+            return 2;
         }
 
-        string? teinte = Flag(args, "--teinte");
+        using var journal = new Journal("barre");
+        return Kurogane.Barre.BarreApp.Executer(journal, ThemeDefinition.Load(chemin));
+    }
 
-        var reglage = new TaskbarStyle.Reglage(
-            MargeLaterale: Nombre("--marge", 12),
-            MargeBasse:    Nombre("--marge-basse", 6),
-            Rayon:         Nombre("--rayon", 10),
+    /// <summary>
+    /// Réglage de restylage, lu dans le thème puis surchargé par les options
+    /// de la ligne de commande. Partagé par taskbar-style et resident, pour
+    /// que les deux se comportent exactement pareil.
+    /// </summary>
+    private static TaskbarStyle.Reglage Reglage(string[] args, Journal journal)
+    {
+        TaskbarStyleSection? section = null;
+
+        if (Flag(args, "--theme") is { } chemin)
+        {
+            var theme = ThemeDefinition.Load(chemin);
+            section = theme.TaskbarStyle;
+
+            // Annoncer le thème chargé, et surtout son absence de section :
+            // un binaire à jour lisant un thème périmé est l'erreur la plus
+            // coûteuse du projet, parce qu'elle ne ressemble pas à une erreur.
+            journal.Info($"thème « {theme.Name} » v{theme.Version}");
+
+            if (section is null)
+                journal.Warn("ce thème ne déclare pas de section « taskbarStyle » : "
+                           + "les valeurs par défaut s'appliquent");
+
+            journal.Blank();
+        }
+
+        int Nombre(string nom, int? duTheme, int defaut)
+        {
+            string? brut = Flag(args, nom);
+            if (brut is not null && int.TryParse(brut, out int n)) return n;
+            return duTheme ?? defaut;
+        }
+
+        string? teinte = Flag(args, "--teinte") ?? section?.Teinte;
+
+        return new TaskbarStyle.Reglage(
+            MargeLaterale: Nombre("--marge",       section?.Marge,      12),
+            MargeBasse:    Nombre("--marge-basse", section?.MargeBasse,  6),
+            Rayon:         Nombre("--rayon",       section?.Rayon,      10),
             Teinte:        teinte is null ? null : ColorUtil.Parse(teinte),
-            Opacite:       (byte)Math.Clamp(Nombre("--opacite", 200), 0, 255),
-            Acrylique:     !Has(args, "--sans-acrylique"));
-
-        return TaskbarStyle.Appliquer(journal, reglage);
+            Opacite:       (byte)Math.Clamp(Nombre("--opacite", section?.Opacite, 200), 0, 255),
+            Acrylique:     !Has(args, "--sans-acrylique") && (section?.Acrylique ?? true));
     }
 
     // --------------------------------------------- probe-mun-ecriture (A)
@@ -699,6 +759,23 @@ internal static class Program
                   avoir remplacé un .ico sans changer son nom : l'outil n'a
                   alors rien à modifier, mais le cache du shell est périmé.
                   --purge ferme l'Explorateur et supprime ses bases de cache.
+
+              resident [--theme <fichier.json>] [options de taskbar-style]
+                  Maintient le restylage de la barre : le repose à chaque
+                  fois qu'elle réapparaît — redémarrage d'explorer,
+                  changement de résolution ou de mise à l'échelle.
+                  Occupe le terminal jusqu'à Ctrl+C, et retire le style en
+                  partant. Rien n'est écrit sur le disque.
+
+              taskbar-style [--theme <fichier.json>] [--marge N]
+                            [--marge-basse N] [--rayon N] [--teinte "#RRGGBB"]
+                            [--opacite 0-255] [--sans-acrylique]
+                            [--reinitialiser]
+                  Restyle la barre des tâches à chaud : barre flottante à
+                  coins arrondis, teinte acrylique. L'effet ne survit pas à
+                  un redémarrage d'explorer — voir « resident ».
+                  Sous PowerShell, les guillemets autour de la couleur sont
+                  indispensables : le dièse y ouvre un commentaire.
 
               probe-taskbar
                   Inventaire en lecture seule de la barre des tâches et du

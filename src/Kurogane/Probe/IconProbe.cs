@@ -1,4 +1,5 @@
-﻿using Kurogane.Core;
+﻿using System.IO;
+using Kurogane.Core;
 using Microsoft.Win32;
 
 namespace Kurogane.Probe;

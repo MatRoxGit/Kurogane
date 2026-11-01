@@ -1,4 +1,6 @@
-﻿namespace Kurogane.Core;
+﻿using System.IO;
+
+namespace Kurogane.Core;
 
 /// <summary>
 /// Assemble un fichier .ico multi-resolutions a partir de bitmaps BGRA.

@@ -1,3 +1,4 @@
+using System.IO;
 using Kurogane.Core;
 using Kurogane.Native;
 
