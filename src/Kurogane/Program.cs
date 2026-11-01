@@ -8,7 +8,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.12.0";
+    private const string Version = "0.18.0";
 
     private static readonly IThemeModule[] Modules =
     {
@@ -49,6 +49,7 @@ internal static class Program
                 "taskbar-style" => CmdTaskbarStyle(args),
                 "resident" => CmdResident(args),
                 "barre" => CmdBarre(args),
+                "probe-chrome" => CmdProbeChrome(args),
                 "probe-mun-ecriture" => CmdProbeMunEcriture(args),
                 "substituer-mun" => CmdSubstituerMun(args),
                 "restaurer-mun" => CmdRestaurerMun(args),
@@ -350,6 +351,115 @@ internal static class Program
         using var journal = new Journal("barre");
         return Kurogane.Barre.BarreApp.Executer(journal, ThemeDefinition.Load(chemin));
     }
+
+    /// <summary>
+    /// Sonde l'habillage des fenêtres : pose les attributs DWM, rapporte ce
+    /// que DWM répond pour chaque attribut de chaque fenêtre, attend, puis
+    /// rend tout.
+    ///
+    /// Elle existe parce qu'un écran ne dit pas si un attribut a été refusé
+    /// ou simplement ignoré par l'application. Le code de retour, lui, le
+    /// dit. Rien n'est écrit : à la sortie, les fenêtres retrouvent
+    /// l'habillage de Windows.
+    /// </summary>
+    private static int CmdProbeChrome(string[] args)
+    {
+        string? chemin = Flag(args, "--theme");
+
+        if (chemin is null)
+        {
+            Console.Error.WriteLine("Usage : kurogane probe-chrome --theme <fichier.json> "
+                                  + "[--secondes N]");
+            return 2;
+        }
+
+        using var journal = new Journal("probe-chrome");
+
+        var theme = ThemeDefinition.Load(chemin);
+        journal.Info($"thème « {theme.Name} » v{theme.Version}");
+
+        var f = theme.Fenetres;
+        if (f is null)
+        {
+            journal.Error("ce thème ne déclare pas de section « fenetres ».");
+            return 1;
+        }
+
+        var reglage = new Kurogane.Barre.ChromeFenetres.Reglage(
+            CoinsCarres: f.CoinsCarres ?? false,
+            BarreTitre:  f.BarreTitre is null ? null : ColorUtil.Parse(f.BarreTitre),
+            TexteTitre:  f.TexteTitre is null ? null : ColorUtil.Parse(f.TexteTitre),
+            Bordure:     f.Bordure    is null ? null : ColorUtil.Parse(f.Bordure));
+
+        journal.Info($"coins carrés : {reglage.CoinsCarres}");
+        journal.Info($"barre-titre  : {reglage.BarreTitre?.ToString() ?? "—"}");
+        journal.Info($"texte-titre  : {reglage.TexteTitre?.ToString() ?? "—"}");
+        journal.Info($"bordure      : {reglage.Bordure?.ToString() ?? "—"}");
+        journal.Blank();
+
+        // Mesure avant : sans elle, une couleur sombre posée sur le gris
+        // sombre de Windows ne se distingue pas à l'œil, et on conclut à
+        // tort que l'attribut n'a pas pris.
+        var candidates = Kurogane.Barre.ChromeFenetres.Candidates();
+        var avant = candidates.ToDictionary(
+            c => c.Hwnd, c => Kurogane.Barre.MesureChrome.Lire(c.Hwnd));
+
+        journal.Step("Pose");
+
+        var chrome = new Kurogane.Barre.ChromeFenetres(reglage);
+        int posees = chrome.Appliquer(journal);
+
+        journal.Blank();
+        journal.Ok($"{posees} fenêtre(s) traitée(s)");
+
+        // DWM repeint de façon asynchrone : mesurer trop tôt lit l'ancienne
+        // image.
+        System.Threading.Thread.Sleep(700);
+
+        journal.Blank();
+        journal.Step("Mesure à l'écran");
+        journal.Info("couleur dominante lue sur le pixel, avant → après");
+        journal.Info("une fenêtre recouverte par une autre renvoie celle de devant");
+        journal.Blank();
+
+        foreach (var c in candidates)
+        {
+            var apres = Kurogane.Barre.MesureChrome.Lire(c.Hwnd);
+
+            journal.Info($"  {c.Classe,-24} « {c.Titre} »");
+            journal.Info($"      caption   {Couleur(avant.GetValueOrDefault(c.Hwnd)?.Caption)}"
+                       + $" → {Couleur(apres?.Caption)}");
+            journal.Info($"      bordure   {Couleur(avant.GetValueOrDefault(c.Hwnd)?.Bordure)}"
+                       + $" → {Couleur(apres?.Bordure)}");
+        }
+
+        int secondes = int.TryParse(Flag(args, "--secondes"), out var n) ? n : 20;
+
+        journal.Blank();
+        journal.Step($"Observation — {secondes} s");
+        journal.Info("Regarde les fenêtres maintenant. Entrée pour rendre avant la fin.");
+
+        var fin = DateTime.UtcNow.AddSeconds(secondes);
+        while (DateTime.UtcNow < fin)
+        {
+            // KeyAvailable lève si l'entrée est redirigée — cas d'un appel
+            // depuis un script. On se contente alors d'attendre.
+            if (!Console.IsInputRedirected
+                && Console.KeyAvailable
+                && Console.ReadKey(true).Key == ConsoleKey.Enter) break;
+            System.Threading.Thread.Sleep(100);
+        }
+
+        journal.Blank();
+        journal.Step("Restitution");
+        chrome.Restaurer();
+        journal.Ok("Habillage rendu à Windows.");
+        journal.Info("Rien n'a été écrit : il n'y a aucun état à restaurer.");
+
+        return 0;
+    }
+
+    private static string Couleur(Rgb? c) => c?.ToString() ?? "—";
 
     /// <summary>
     /// Réglage de restylage, lu dans le thème puis surchargé par les options
@@ -759,6 +869,25 @@ internal static class Program
                   avoir remplacé un .ico sans changer son nom : l'outil n'a
                   alors rien à modifier, mais le cache du shell est périmé.
                   --purge ferme l'Explorateur et supprime ses bases de cache.
+
+              probe-chrome --theme <fichier.json> [--secondes N]
+                  Pose l'habillage des fenêtres et rapporte, pour chaque
+                  fenêtre et chaque attribut, ce que DWM répond. Attend puis
+                  rend tout. Sert à distinguer un attribut refusé par
+                  Windows d'un attribut accepté mais ignoré par
+                  l'application. Rien n'est écrit.
+
+              barre --theme <fichier.json>
+                  Remplace la barre des tâches de Windows par celle de
+                  Kurogane : la barre de Windows est masquée, la nôtre vient
+                  se loger exactement dans la bande qu'elle réserve.
+                  Si le thème déclare une section « fenetres », habille aussi
+                  les barres de titre de toutes les applications : angles
+                  vifs, couleurs de titre et de liseré. Les applications qui
+                  dessinent leur propre barre de titre — Chrome, Firefox,
+                  VS Code — restent inchangées.
+                  Occupe le terminal jusqu'à Ctrl+C, qui rend la barre de
+                  Windows et l'habillage. Rien n'est écrit sur le disque.
 
               resident [--theme <fichier.json>] [options de taskbar-style]
                   Maintient le restylage de la barre : le repose à chaque

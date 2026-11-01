@@ -1,147 +1,397 @@
 <!--
-  KUROGANE // barre des tâches
+  KUROGANE // barre des tâches — industriel lourd
 
-  Angles vifs, traits nets, aucun arrondi : le vocabulaire est industriel,
-  pas celui de Windows 11. Chaque élément est un cadre, pas une pastille.
+  Les coins coupés sont dessinés par Biseau, pas par des polygones : un
+  polygone a des coordonnées fixes, et la coupe s'étirerait avec le bouton.
 -->
 <Window x:Class="Kurogane.Barre.FenetreBarre"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:k="clr-namespace:Kurogane.Barre"
         Title="Kurogane"
         WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False"
         Topmost="True" UseLayoutRounding="True" SnapsToDevicePixels="True"
         Background="{DynamicResource Obsidienne}">
 
     <Window.Resources>
-        <SolidColorBrush x:Key="Obsidienne"   Color="#FF0B0708" />
-        <SolidColorBrush x:Key="Surface"      Color="#FF120A0C" />
-        <SolidColorBrush x:Key="Rouge"        Color="#FFC8102E" />
-        <SolidColorBrush x:Key="RougeVoile"   Color="#38C8102E" />
-        <SolidColorBrush x:Key="TexteVif"     Color="#FFF4F0F1" />
-        <SolidColorBrush x:Key="TexteEteint"  Color="#FF8C6268" />
+        <SolidColorBrush x:Key="Obsidienne"  Color="#FF080506" />
+        <SolidColorBrush x:Key="Surface"     Color="#FF120A0C" />
+        <SolidColorBrush x:Key="Creux"       Color="#FF0C0608" />
+        <SolidColorBrush x:Key="Soudure"     Color="#FF241216" />
+        <SolidColorBrush x:Key="Rail"        Color="#FF160B0E" />
+        <SolidColorBrush x:Key="Rouge"       Color="#FFC8102E" />
+        <SolidColorBrush x:Key="RougeVoile"  Color="#38C8102E" />
+        <SolidColorBrush x:Key="RougeEteint" Color="#FF3A1016" />
+        <SolidColorBrush x:Key="Ambre"       Color="#FFFF9E00" />
+        <SolidColorBrush x:Key="TexteVif"    Color="#FFF4F0F1" />
+        <SolidColorBrush x:Key="TexteEteint" Color="#FF8C6268" />
         <FontFamily x:Key="Mono">JetBrains Mono, Consolas, Courier New</FontFamily>
 
-        <!-- Bouton : cadre rouge, fond sombre, aucun arrondi. -->
-        <Style x:Key="Cellule" TargetType="Button">
+        <DrawingBrush x:Key="Balayage" TileMode="Tile" Viewport="0,0,3,3"
+                      ViewportUnits="Absolute" Opacity="0.18">
+            <DrawingBrush.Drawing>
+                <GeometryDrawing Brush="#FF000000">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="0,0,3,1" />
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingBrush.Drawing>
+        </DrawingBrush>
+
+        <!-- Baie : un logement blindé, coins coupés. -->
+        <Style x:Key="Baie" TargetType="Button">
             <Setter Property="Background" Value="{DynamicResource Surface}" />
             <Setter Property="BorderBrush" Value="{DynamicResource Rouge}" />
-            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderThickness" Value="1.5" />
             <Setter Property="Foreground" Value="{DynamicResource TexteVif}" />
             <Setter Property="FontFamily" Value="{DynamicResource Mono}" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontSize" Value="10.5" />
             <Setter Property="Padding" Value="10,0" />
-            <Setter Property="Margin" Value="3,0" />
+            <Setter Property="Margin" Value="2,0" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="HorizontalContentAlignment" Value="Center" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Cadre"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                Padding="{TemplateBinding Padding}">
+                        <k:Biseau x:Name="Coque" Coupe="8"
+                                  Background="{TemplateBinding Background}"
+                                  BorderBrush="{TemplateBinding BorderBrush}"
+                                  BorderThickness="{TemplateBinding BorderThickness}"
+                                  Padding="{TemplateBinding Padding}">
                             <ContentPresenter
                                 HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                 VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
-                        </Border>
+                        </k:Biseau>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Cadre" Property="Background"
+                                <Setter TargetName="Coque" Property="Background"
                                         Value="{DynamicResource RougeVoile}" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimationUsingKeyFrames
+                                                Storyboard.TargetName="Coque"
+                                                Storyboard.TargetProperty="Opacity">
+                                                <DiscreteDoubleKeyFrame KeyTime="0:0:0.00" Value="0.35" />
+                                                <DiscreteDoubleKeyFrame KeyTime="0:0:0.04" Value="1.0" />
+                                                <DiscreteDoubleKeyFrame KeyTime="0:0:0.08" Value="0.55" />
+                                                <DiscreteDoubleKeyFrame KeyTime="0:0:0.12" Value="1.0" />
+                                            </DoubleAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Cadre" Property="BorderThickness" Value="2" />
+                                <Setter TargetName="Coque" Property="BorderThickness" Value="2.5" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!--
+          Vignette : une application épinglée. Ni cadre ni fond — l'icône
+          se suffit, et six cadres côte à côte mangeaient la largeur pour
+          n'encadrer que du vide. Le survol pose un fond discret et un trait
+          rouge sous la vignette.
+        -->
+        <Style x:Key="Vignette" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Margin" Value="1,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border x:Name="Fond" Background="{TemplateBinding Background}" />
+                            <Rectangle x:Name="Trait" Height="2" VerticalAlignment="Bottom"
+                                       Fill="{DynamicResource Rouge}" Opacity="0" />
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fond" Property="Background"
+                                        Value="{DynamicResource RougeVoile}" />
+                                <Setter TargetName="Trait" Property="Opacity" Value="1" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Trait" Property="Height" Value="3" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!--
+          Onglet : une fenêtre ouverte. Pas de biseau — le biseau marque un
+          module, c'est-à-dire une pièce structurelle de taille fixe. Les
+          fenêtres vont et viennent : elles forment un rail, et doivent se
+          lire comme tel. Leur seul ornement est le liseré de gauche, qui
+          s'allume au survol.
+        -->
+        <Style x:Key="Onglet" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource Creux}" />
+            <Setter Property="Foreground" Value="{DynamicResource TexteVif}" />
+            <Setter Property="FontFamily" Value="{DynamicResource Mono}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Padding" Value="12,0,14,0" />
+            <Setter Property="Margin" Value="2,0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border x:Name="Fond"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{DynamicResource Soudure}"
+                                    BorderThickness="1" />
+                            <Rectangle x:Name="Liseré" Width="2" HorizontalAlignment="Left"
+                                       Fill="{DynamicResource Rouge}" Opacity="0.5" />
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Fond" Property="Background"
+                                        Value="{DynamicResource RougeVoile}" />
+                                <Setter TargetName="Liseré" Property="Opacity" Value="1.0" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Liseré" Property="Width" Value="3" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="EntreeMenu" TargetType="MenuItem">
+            <Setter Property="Foreground" Value="{DynamicResource TexteVif}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="FontFamily" Value="{DynamicResource Mono}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="Fond" Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Fond" Property="Background"
+                                        Value="{DynamicResource RougeVoile}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="MenuBarre" TargetType="ContextMenu">
+            <Setter Property="Background" Value="{DynamicResource Obsidienne}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Rouge}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <k:Biseau Coupe="10"
+                                  Background="{TemplateBinding Background}"
+                                  BorderBrush="{TemplateBinding BorderBrush}"
+                                  BorderThickness="{TemplateBinding BorderThickness}"
+                                  Padding="0,4">
+                            <StackPanel IsItemsHost="True" />
+                        </k:Biseau>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
-    <!-- Le seul trait épais du dessin : la ligne rouge en haut de la barre. -->
-    <Border BorderBrush="{DynamicResource Rouge}" BorderThickness="0,2,0,0">
-        <Grid Margin="10,0">
+    <Window.ContextMenu>
+        <ContextMenu x:Name="MenuPrincipal" Style="{StaticResource MenuBarre}">
+            <MenuItem x:Name="MenuGestionnaire" Style="{StaticResource EntreeMenu}"
+                      Header="// GESTIONNAIRE DES TÂCHES" />
+            <MenuItem x:Name="MenuBureau" Style="{StaticResource EntreeMenu}"
+                      Header="// AFFICHER LE BUREAU" />
+            <MenuItem x:Name="MenuReglages" Style="{StaticResource EntreeMenu}"
+                      Header="// PARAMÈTRES DE LA BARRE" />
+            <Separator Background="{DynamicResource Rouge}" Opacity="0.4" Margin="0,3" />
+            <MenuItem x:Name="MenuQuitter" Style="{StaticResource EntreeMenu}"
+                      Header="// ARRÊT KRG//OS" />
+        </ContextMenu>
+    </Window.ContextMenu>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="4" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Rail supérieur : liseré rouge et repère central -->
+        <Grid Grid.Row="0" Background="{DynamicResource Rail}">
+            <Rectangle Height="1" VerticalAlignment="Top" Fill="{DynamicResource Rouge}" />
+            <Polygon x:Name="Repere" Points="0,0 560,0 554,4 6,4"
+                     Fill="{DynamicResource Rouge}" HorizontalAlignment="Center" />
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="8,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" MinWidth="0" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
+                <!-- Les fenêtres prennent ce qui reste, et rien de plus :
+                     c'est cette colonne qui absorbe les variations de
+                     résolution. -->
+                <ColumnDefinition Width="*" MinWidth="0" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <!-- Emblème et recherche -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                <Button x:Name="BoutonDemarrer" Style="{StaticResource Cellule}"
-                        Width="44" Height="38" Padding="0"
-                        ToolTip="Menu Démarrer">
-                    <Viewbox Width="24" Height="24">
+            <!-- Module d'amorçage -->
+            <Button x:Name="BoutonDemarrer" Grid.Column="0" Style="{StaticResource Baie}"
+                    Width="118" Height="40" Padding="10,0" VerticalAlignment="Center"
+                    HorizontalContentAlignment="Left" ToolTip="Menu Démarrer">
+                <StackPanel Orientation="Horizontal">
+                    <Viewbox Width="24" Height="24" Margin="0,0,8,0">
                         <Canvas Width="64" Height="64">
-                            <Ellipse Canvas.Left="10" Canvas.Top="10" Width="44" Height="44"
-                                     Stroke="{DynamicResource Rouge}" StrokeThickness="2.4" />
                             <Path Fill="{DynamicResource Rouge}"
                                   Data="M 19,18 L 24,18 L 24,25.5 L 19,31 Z M 19,33 L 24,38.5 L 24,46 L 19,46 Z M 21,32 L 32.5,18 L 38,18 L 26.5,32 L 38,46 L 32.5,46 Z M 29.5,32 L 41,18 L 46.5,18 L 35,32 L 46.5,46 L 41,46 Z" />
                         </Canvas>
                     </Viewbox>
-                </Button>
-
-                <Button x:Name="BoutonRecherche" Style="{StaticResource Cellule}"
-                        Width="220" Height="34" Margin="8,0,0,0"
-                        HorizontalContentAlignment="Left" ToolTip="Rechercher">
-                    <StackPanel Orientation="Horizontal">
-                        <Canvas Width="12" Height="12" Margin="0,0,8,0" VerticalAlignment="Center">
-                            <Path Stroke="{DynamicResource TexteEteint}" StrokeThickness="1.4"
-                                  Data="M 1,1 L 8,1 L 8,8 L 1,8 Z M 8,8 L 11,11" />
-                        </Canvas>
-                        <TextBlock Text="EXEC // RECHERCHE..."
-                                   Foreground="{DynamicResource TexteEteint}"
-                                   FontFamily="{DynamicResource Mono}" FontSize="11"
-                                   VerticalAlignment="Center" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="KRG//OS" FontWeight="Bold" FontSize="11"
+                                   Foreground="{DynamicResource TexteVif}"
+                                   FontFamily="{DynamicResource Mono}" />
+                        <TextBlock x:Name="Amorce" Text="SYS.BOOT" FontSize="8"
+                                   Foreground="{DynamicResource Rouge}"
+                                   FontFamily="{DynamicResource Mono}" />
                     </StackPanel>
-                </Button>
-            </StackPanel>
+                </StackPanel>
+            </Button>
 
-            <!-- Bloc d'état -->
-            <Border Grid.Column="1" Margin="12,0,0,0" Padding="10,3"
-                    VerticalAlignment="Center"
-                    Background="{DynamicResource Surface}"
-                    BorderBrush="{DynamicResource Rouge}" BorderThickness="1">
-                <StackPanel>
-                    <TextBlock x:Name="Noeud" Text="SYS.NODE // 01"
+            <!-- Console de commande -->
+            <Button x:Name="BoutonRecherche" Grid.Column="1" Style="{StaticResource Baie}"
+                    Width="232" Height="38" Margin="8,0,0,0" Padding="14,0"
+                    VerticalAlignment="Center" Background="{DynamicResource Creux}"
+                    BorderThickness="1" HorizontalContentAlignment="Left"
+                    ToolTip="Rechercher">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="CMD // INJECT_QUERY" FontSize="10.5"
                                Foreground="{DynamicResource TexteEteint}"
-                               FontFamily="{DynamicResource Mono}" FontSize="9" />
-                    <TextBlock x:Name="Etat" Text="SEC.ONLINE"
-                               Foreground="{DynamicResource Rouge}" FontWeight="Bold"
-                               FontFamily="{DynamicResource Mono}" FontSize="10" />
+                               FontFamily="{DynamicResource Mono}"
+                               VerticalAlignment="Center" />
+                    <TextBlock x:Name="Curseur" Text="_" FontSize="10.5" FontWeight="Bold"
+                               Foreground="{DynamicResource Rouge}"
+                               FontFamily="{DynamicResource Mono}"
+                               VerticalAlignment="Center" />
                 </StackPanel>
-            </Border>
+            </Button>
 
-            <!-- Épingles du thème, puis fenêtres ouvertes -->
+            <!-- Applications épinglées -->
             <StackPanel Grid.Column="2" Orientation="Horizontal"
-                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                        Margin="12,0,0,0" VerticalAlignment="Center">
                 <StackPanel x:Name="Epingles" Orientation="Horizontal" />
-                <Border x:Name="Separateur" Width="1" Margin="10,8"
-                        Background="{DynamicResource Rouge}" Opacity="0.45"
-                        Visibility="Collapsed" />
-                <StackPanel x:Name="Fenetres" Orientation="Horizontal" />
+                <Rectangle x:Name="Separateur" Width="2" Margin="10,6"
+                           Fill="{DynamicResource Soudure}" Visibility="Collapsed" />
             </StackPanel>
 
-            <!-- Horloge -->
-            <Border Grid.Column="3" Padding="10,3" VerticalAlignment="Center"
-                    Background="{DynamicResource Surface}"
-                    BorderBrush="{DynamicResource Rouge}" BorderThickness="1">
-                <StackPanel>
-                    <TextBlock x:Name="Heure" Text="00:00:00"
-                               Foreground="{DynamicResource TexteVif}" FontWeight="Bold"
-                               FontFamily="{DynamicResource Mono}" FontSize="11"
+            <!-- Fenêtres ouvertes : zone élastique, rognée plutôt que débordante -->
+            <Grid x:Name="ZoneFenetres" Grid.Column="3" ClipToBounds="True">
+                <StackPanel x:Name="Fenetres" Orientation="Horizontal"
+                            VerticalAlignment="Center" HorizontalAlignment="Left" />
+            </Grid>
+
+            <!-- Télémétrie -->
+            <k:Biseau x:Name="BlocMesures" Grid.Column="4" Coupe="8" Height="40"
+                      Width="150" Padding="10,4"
+                      VerticalAlignment="Center" Margin="0,0,6,0"
+                      Background="{DynamicResource Surface}"
+                      BorderBrush="{DynamicResource Rouge}" BorderThickness="1.5">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="CPU" FontSize="8"
+                               Foreground="{DynamicResource TexteEteint}"
+                               FontFamily="{DynamicResource Mono}" VerticalAlignment="Center" />
+                    <k:Jauge x:Name="JaugeCpu" Grid.Row="0" Grid.Column="1" Height="6"
+                             Margin="6,0" VerticalAlignment="Center" Segments="12"
+                             Allume="{StaticResource Rouge}"
+                             Eteint="{StaticResource RougeEteint}"
+                             Alerte="{StaticResource Ambre}" />
+                    <TextBlock x:Name="ValeurCpu" Grid.Row="0" Grid.Column="2" Text="--%"
+                               FontSize="8" MinWidth="24" TextAlignment="Right"
+                               Foreground="{DynamicResource TexteVif}"
+                               FontFamily="{DynamicResource Mono}" VerticalAlignment="Center" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="MEM" FontSize="8"
+                               Foreground="{DynamicResource TexteEteint}"
+                               FontFamily="{DynamicResource Mono}" VerticalAlignment="Center" />
+                    <k:Jauge x:Name="JaugeMemoire" Grid.Row="1" Grid.Column="1" Height="6"
+                             Margin="6,0" VerticalAlignment="Center" Segments="12"
+                             Allume="{StaticResource Rouge}"
+                             Eteint="{StaticResource RougeEteint}"
+                             Alerte="{StaticResource Ambre}" />
+                    <TextBlock x:Name="ValeurMemoire" Grid.Row="1" Grid.Column="2" Text="--%"
+                               FontSize="8" MinWidth="24" TextAlignment="Right"
+                               Foreground="{DynamicResource TexteVif}"
+                               FontFamily="{DynamicResource Mono}" VerticalAlignment="Center" />
+                </Grid>
+            </k:Biseau>
+
+            <!-- Chronomètre : sans cadre, signalé par une veilleuse -->
+            <StackPanel Grid.Column="5" Orientation="Horizontal"
+                        VerticalAlignment="Center" Margin="10,0,4,0">
+                <Ellipse x:Name="Veilleuse" Width="6" Height="6" Margin="0,0,10,0"
+                         VerticalAlignment="Center" Fill="{DynamicResource Rouge}">
+                    <Ellipse.Effect>
+                        <DropShadowEffect Color="#FFC8102E" BlurRadius="10"
+                                          ShadowDepth="0" Opacity="0.9" />
+                    </Ellipse.Effect>
+                </Ellipse>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="Heure" Text="00:00:00" FontWeight="Bold" FontSize="12"
+                               Foreground="{DynamicResource TexteVif}"
+                               FontFamily="{DynamicResource Mono}"
                                HorizontalAlignment="Right" />
-                    <TextBlock x:Name="DateDuJour" Text="0000.00.00"
+                    <TextBlock x:Name="DateDuJour" Text="0000.00.00" FontSize="8.5"
                                Foreground="{DynamicResource Rouge}"
-                               FontFamily="{DynamicResource Mono}" FontSize="9"
+                               FontFamily="{DynamicResource Mono}"
                                HorizontalAlignment="Right" />
                 </StackPanel>
-            </Border>
+            </StackPanel>
         </Grid>
-    </Border>
+
+        <Rectangle x:Name="Faisceau" Grid.RowSpan="2" Width="160" HorizontalAlignment="Left"
+                   IsHitTestVisible="False" Opacity="0.0">
+            <Rectangle.Fill>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#00C8102E" Offset="0.0" />
+                    <GradientStop Color="#22C8102E" Offset="0.5" />
+                    <GradientStop Color="#00C8102E" Offset="1.0" />
+                </LinearGradientBrush>
+            </Rectangle.Fill>
+            <Rectangle.RenderTransform>
+                <TranslateTransform x:Name="PositionFaisceau" X="-200" />
+            </Rectangle.RenderTransform>
+        </Rectangle>
+
+        <Rectangle Grid.RowSpan="2" Fill="{StaticResource Balayage}" IsHitTestVisible="False" />
+    </Grid>
 </Window>

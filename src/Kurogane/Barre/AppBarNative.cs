@@ -58,6 +58,7 @@ internal static class AppBarNative
 
     internal const ushort VK_LWIN = 0x5B;
     internal const ushort VK_S    = 0x53;
+    internal const ushort VK_D    = 0x44;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct INPUT

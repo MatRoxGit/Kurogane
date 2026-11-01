@@ -15,6 +15,18 @@ plus bas.
 > *Obsidian*, est une création originale : il ne reprend ni le nom, ni le logo,
 > ni les éléments graphiques d'une œuvre existante.
 
+## Aperçu
+
+![Le bureau sous le thème Obsidian](docs/apercu-bureau.png)
+
+La barre Kurogane, en détail :
+
+![La barre Kurogane](docs/apercu-barre.png)
+
+De gauche à droite : le module système, la console de lancement, les
+épinglés du thème, les fenêtres ouvertes, les jauges processeur et mémoire,
+l'horloge.
+
 ## Le principe
 
 **La simulation est le mode par défaut.** Sans `--commit`, rien n'est jamais
@@ -61,6 +73,13 @@ kurogane restore --last --commit
 # Forcer le shell à relire les icônes
 kurogane refresh-icons            # notification + ie4uinit
 kurogane refresh-icons --purge    # purge du cache, redémarre explorer
+```
+
+Remplacer la barre des tâches et habiller les fenêtres, à chaud :
+
+```
+kurogane barre --theme themes\kurogane-obsidian.json
+kurogane probe-chrome --theme themes\kurogane-obsidian.json
 ```
 
 Restylage de la barre des tâches, à chaud et sans rien écrire :
@@ -151,6 +170,24 @@ l'élévation ne la garantissant pas.
 ```
 
 La section `icons` accepte quinze entrées ; l'exemple n'en montre que six.
+
+Quatre sections supplémentaires, facultatives, n'interviennent pas dans
+`apply` : elles décrivent des effets posés à chaud, qui n'écrivent rien.
+
+| Section        | Lue par                   | Contenu                                           |
+| -------------- | ------------------------- | ------------------------------------------------- |
+| `taskbarStyle` | `taskbar-style`, `resident` | marges, rayon, teinte et opacité de la barre Windows |
+| `barre`        | `barre`                   | nœud, état, suffixe de date et épingles de la barre Kurogane |
+| `fenetres`     | `barre`, `probe-chrome`   | `coinsCarres`, `barreTitre`, `texteTitre`, `bordure` |
+
+```json
+"fenetres": {
+  "coinsCarres": true,
+  "barreTitre": "#120A0C",
+  "texteTitre": "#E8DFE1",
+  "bordure": "#C8102E"
+}
+```
 Chaque entrée est facultative et une icône absente laisse celle de Windows en
 place.
 
@@ -339,12 +376,77 @@ Deux choses à savoir :
 fonctionne depuis des années, mais un échec est traité comme une réponse
 possible, pas comme une anomalie.
 
+## La barre Kurogane
+
+Le restylage ci-dessus ne change que l'enveloppe : marges, coins, teinte. La
+barre reste celle de Windows, dessinée en XAML, hors d'atteinte. Pour aller
+plus loin, Kurogane la **remplace**.
+
+```
+kurogane barre --theme themes\kurogane-obsidian.json
+```
+
+La barre de Windows est masquée, pas désinstallée. La bande d'écran qu'elle
+réserve reste réservée — cette réservation ne dépend pas de la visibilité de
+la fenêtre — et la nôtre vient s'y loger exactement : aucune négociation de
+zone de travail, aucune fenêtre de l'utilisateur déplacée.
+
+Elle porte un module système, une console de lancement, les épinglés du
+thème, la liste des fenêtres ouvertes avec aperçu DWM au survol, des jauges
+processeur et mémoire, et l'horloge. La mise en page se redimensionne seule :
+les onglets de fenêtres se rétrécissent jusqu'à l'icône seule plutôt que de
+déborder, pour tenir sur n'importe quelle résolution.
+
+**Rien n'est écrit sur le disque.** La restitution est posée sur `ProcessExit`
+autant que dans le `finally` : une exception, un Ctrl+C ou un arrêt brutal
+rendent la barre de Windows. Laisser un utilisateur sans barre des tâches
+serait la pire sortie possible pour un projet qui promet la réversibilité.
+
+## Habillage des fenêtres
+
+Si le thème déclare une section `fenetres`, la commande `barre` habille aussi
+les barres de titre de toutes les applications : angles vifs, couleur de
+caption, de titre et de liseré.
+
+Le mécanisme est celui des attributs DWM documentés par Microsoft depuis
+Windows 11 — `DWMWA_WINDOW_CORNER_PREFERENCE`, `DWMWA_CAPTION_COLOR`,
+`DWMWA_TEXT_COLOR`, `DWMWA_BORDER_COLOR`. Par fenêtre, depuis l'extérieur,
+sans toucher au code des applications et sans rien écrire.
+
+```
+kurogane probe-chrome --theme themes\kurogane-obsidian.json
+```
+
+La sonde pose les attributs, rapporte ce que DWM répond pour chacun, **mesure
+au pixel la couleur réellement affichée avant et après**, puis rend tout.
+Cette mesure existe parce qu'un `ok` ne prouve rien : une couleur sombre posée
+sur le gris sombre de Windows est invisible à l'œil, et une application qui
+peint son propre caption recouvre la valeur sans que rien ne le signale. La
+question « accepté ou visible ? » ne se tranche qu'en lisant l'écran.
+
+### Deux limites
+
+**Les applications qui dessinent leur propre barre de titre** n'ont pas de
+caption système à colorer : l'Explorateur de Windows 11, les Paramètres, le
+Gestionnaire de tâches, le Bloc-notes, VS Code, les navigateurs. Elles
+reçoivent les angles vifs et le liseré, rien de plus. Seules les fenêtres à
+caption système — PowerShell, `regedit`, les boîtes de dialogue classiques —
+changent aussi de couleur de barre de titre.
+
+**DWM n'offre aucun moyen de relire** l'habillage courant d'une fenêtre : il
+existe un *setter*, pas de *getter*. « Restaurer » signifie donc rendre le
+choix à Windows (`DWMWA_COLOR_DEFAULT`), pas rejouer une valeur capturée comme
+le fait le socle de registre. C'est une limite de l'API, sans conséquence ici
+puisque rien n'est écrit et qu'une fenêtre fermée emporte son habillage.
+
 ## État
 
-v0.9.2 — mode sombre, accent, fond d'écran, 15 icônes réparties sur trois
+v0.18.0 — mode sombre, accent, fond d'écran, 15 icônes réparties sur trois
 mécanismes (registre utilisateur, registre machine, `desktop.ini`), barre des
-tâches et menu Démarrer. Plus, en commande séparée, la substitution de
-ressources dans `imageres.dll.mun` pour les cinq entrées de l'Accès rapide.
+tâches et menu Démarrer. Plus, en commandes séparées : la substitution de
+ressources dans `imageres.dll.mun` pour les cinq entrées de l'Accès rapide,
+la barre des tâches de remplacement, et l'habillage des fenêtres par
+attributs DWM.
 
 ### Deux limites constatées, non contournables
 

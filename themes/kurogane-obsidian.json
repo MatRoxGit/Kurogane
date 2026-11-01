@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "Kurogane Obsidian",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "author": "Mathieu",
   "darkMode": {
     "apps": true,
@@ -79,6 +79,12 @@
         "icone": "reseau.ico"
       }
     ]
+  },
+  "fenetres": {
+    "coinsCarres": true,
+    "barreTitre": "#120A0C",
+    "texteTitre": "#E8DFE1",
+    "bordure": "#C8102E"
   },
   "icons": {
     "directory": "../assets/icons",

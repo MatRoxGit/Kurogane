@@ -190,6 +190,21 @@ internal static class FenetresOuvertes
         }
     }
 
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool PostMessage(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    /// <summary>
+    /// Demande la fermeture. PostMessage et non SendMessage : on ne bloque
+    /// pas la barre en attendant qu'une application décide de se fermer, et
+    /// elle reste libre d'afficher une demande d'enregistrement.
+    /// </summary>
+    internal static void Fermer(IntPtr h)
+    {
+        const uint WM_CLOSE = 0x0010;
+        PostMessage(h, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+    }
+
     /// <summary>
     /// Ramène une fenêtre au premier plan. Windows restreint les changements
     /// de premier plan pour empêcher le vol de focus ; un clic de

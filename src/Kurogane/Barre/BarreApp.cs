@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Threading;
 using Kurogane.Core;
 using Kurogane.Native;
@@ -24,6 +24,13 @@ public static class BarreApp
 {
     private const string Classe = "Shell_TrayWnd";
     private const string ClasseSecondaire = "Shell_SecondaryTrayWnd";
+
+    /// <summary>
+    /// L'habillage des fenêtres, s'il est demandé par le thème. Statique
+    /// parce que <see cref="Rendre"/> doit pouvoir le défaire depuis le
+    /// gestionnaire ProcessExit, qui n'a accès à aucun contexte.
+    /// </summary>
+    private static ChromeFenetres? _chrome;
 
     public static int Executer(Journal journal, ThemeDefinition theme)
     {
@@ -71,6 +78,8 @@ public static class BarreApp
 
         try
         {
+            _chrome = Habillage(journal, theme);
+
             var application = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
             var fenetre = new FenetreBarre(theme, config, journal);
 
@@ -84,7 +93,11 @@ public static class BarreApp
             // vérifie régulièrement, comme le fait déjà le résident de
             // restylage — la même redondance pour la même raison.
             veille = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-            veille.Tick += (_, _) => Replacer(fenetre);
+            veille.Tick += (_, _) =>
+            {
+                Replacer(fenetre);
+                _chrome?.Appliquer();
+            };
             veille.Start();
 
             Console.CancelKeyPress += (_, e) =>
@@ -122,9 +135,54 @@ public static class BarreApp
     {
         foreach (var h in Barres()) AppBarNative.Afficher(h);
 
+        // Rendre() est appelable depuis deux fils : le « finally » et
+        // ProcessExit. L'échange atomique garantit qu'un seul des deux
+        // défait l'habillage.
+        var chrome = System.Threading.Interlocked.Exchange(ref _chrome, null);
+        chrome?.Restaurer();
+
         journal?.Step("Arrêt");
         journal?.Ok("Barre de Windows rendue.");
+
+        if (chrome is not null)
+            journal?.Ok("Habillage des fenêtres rendu à Windows.");
+
         journal?.Info("Rien n'a été écrit : il n'y a aucun état à restaurer.");
+    }
+
+    /// <summary>
+    /// Construit l'habillage des fenêtres si le thème le demande, et pose
+    /// une première passe tout de suite : les fenêtres déjà ouvertes n'ont
+    /// pas à attendre le prochain tour du chien de garde.
+    /// </summary>
+    private static ChromeFenetres? Habillage(Journal journal, ThemeDefinition theme)
+    {
+        var f = theme.Fenetres;
+        if (f is null) return null;
+
+        bool coins = f.CoinsCarres ?? false;
+
+        var reglage = new ChromeFenetres.Reglage(
+            CoinsCarres: coins,
+            BarreTitre:  f.BarreTitre is null ? null : ColorUtil.Parse(f.BarreTitre),
+            TexteTitre:  f.TexteTitre is null ? null : ColorUtil.Parse(f.TexteTitre),
+            Bordure:     f.Bordure    is null ? null : ColorUtil.Parse(f.Bordure));
+
+        if (!coins && reglage.BarreTitre is null && reglage.TexteTitre is null
+            && reglage.Bordure is null)
+        {
+            journal.Warn("section « fenetres » vide : aucun habillage posé");
+            return null;
+        }
+
+        var chrome = new ChromeFenetres(reglage);
+        int posees = chrome.Appliquer();
+
+        journal.Ok($"habillage des fenêtres : {posees} fenêtre(s) traitée(s)");
+        journal.Info("les applications qui dessinent leur propre barre de titre "
+                   + "— Chrome, Firefox, VS Code — restent inchangées");
+
+        return chrome;
     }
 
     /// <summary>

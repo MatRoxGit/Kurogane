@@ -18,6 +18,7 @@ public sealed class ThemeDefinition
     public StartMenuSection? StartMenu { get; set; }
     public TaskbarStyleSection? TaskbarStyle { get; set; }
     public BarreSection?    Barre     { get; set; }
+    public FenetresSection? Fenetres  { get; set; }
 
     /// <summary>Dossier d'où le thème a été chargé — sert à résoudre les chemins relatifs.</summary>
     [JsonIgnore]
@@ -147,6 +148,33 @@ public sealed class BarreSection
     public string? SuffixeDate { get; set; }
 
     public List<EpingleBarre>? Epingles { get; set; }
+}
+
+/// <summary>
+/// L'habillage des fenêtres de toutes les applications : barre de titre,
+/// texte, bordure, et angles vifs plutôt qu'arrondis.
+///
+/// Posé par les attributs DWM, donc sans rien écrire sur le disque et sans
+/// toucher au code des applications. Deux limites assumées : une
+/// application qui dessine sa propre barre de titre — Chrome, Firefox,
+/// VS Code — n'a pas de barre système à colorer et reste inchangée ; et DWM
+/// n'offre aucun moyen de relire l'habillage courant d'une fenêtre, donc le
+/// retour arrière rend le choix à Windows au lieu de rejouer une valeur
+/// capturée.
+/// </summary>
+public sealed class FenetresSection
+{
+    /// <summary>Angles vifs. Absent ou faux : on laisse l'arrondi de Windows 11.</summary>
+    public bool? CoinsCarres { get; set; }
+
+    /// <summary>Couleur de la barre de titre, au format #RRGGBB.</summary>
+    public string? BarreTitre { get; set; }
+
+    /// <summary>Couleur du titre, au format #RRGGBB.</summary>
+    public string? TexteTitre { get; set; }
+
+    /// <summary>Couleur du liseré de fenêtre, au format #RRGGBB.</summary>
+    public string? Bordure { get; set; }
 }
 
 public sealed class TaskbarStyleSection
