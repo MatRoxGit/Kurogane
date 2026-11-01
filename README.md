@@ -287,9 +287,47 @@ par-dessus un fichier mis à jour annulerait un correctif de sécurité.
 Ces deux conséquences sont inhérentes à la méthode. Elles ne sont pas
 corrigeables, seulement annoncées.
 
+## Restylage à chaud de la barre des tâches
+
+Les réglages de registre ne changent que la disposition. Pour transformer
+l'apparence, Kurogane restyle la **fenêtre vivante** — comme le font
+TranslucentTB et RoundedTB, et contrairement à ExplorerPatcher ou Start11 qui
+injectent du code dans `explorer.exe`.
+
+```
+kurogane taskbar-style --marge 12 --marge-basse 6 --rayon 10 --teinte "#C8102E" --opacite 180
+kurogane taskbar-style --reinitialiser
+```
+
+`SetWindowRgn` sur `Shell_TrayWnd` découpe la barre en rectangle arrondi —
+le découpage s'applique aussi aux fenêtres filles, pont XAML compris.
+`SetWindowCompositionAttribute` y pose une teinte acrylique.
+
+**Rien n'est écrit.** C'est le mécanisme le plus réversible du projet : il
+n'y a aucun état à restaurer, seulement un effet à cesser d'appliquer. Un
+redémarrage d'explorer suffit à tout rendre à l'origine.
+
+Revers de la médaille : l'effet ne survit ni à un redémarrage d'explorer, ni
+à un changement de résolution. Le rendre permanent demande un compagnon
+résident qui le repose sur l'événement `TaskbarCreated`.
+
+Deux choses à savoir :
+
+- **On découpe, on ne redimensionne pas.** Avec des icônes alignées à gauche
+  et la zone de notification à droite, le contenu occupe toute la largeur :
+  une marge latérale trop grande rogne l'horloge. Le « dock flottant »
+  suppose des icônes centrées.
+- **Le processus doit être sensible au DPI.** Sans ça, Windows virtualise
+  les coordonnées et la région est posée de travers : sur un écran à 125 %,
+  la zone de notification disparaît.
+
+`SetWindowCompositionAttribute` n'est pas documenté par Microsoft. Il
+fonctionne depuis des années, mais un échec est traité comme une réponse
+possible, pas comme une anomalie.
+
 ## État
 
-v0.8.3 — mode sombre, accent, fond d'écran, 15 icônes réparties sur trois
+v0.9.2 — mode sombre, accent, fond d'écran, 15 icônes réparties sur trois
 mécanismes (registre utilisateur, registre machine, `desktop.ini`), barre des
 tâches et menu Démarrer. Plus, en commande séparée, la substitution de
 ressources dans `imageres.dll.mun` pour les cinq entrées de l'Accès rapide.

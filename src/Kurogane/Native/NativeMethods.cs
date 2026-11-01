@@ -79,6 +79,26 @@ internal static class NativeMethods
                            string.Empty, SMTO_ABORTIFHUNG, 1000, out _);
     }
 
+    private static readonly IntPtr PER_MONITOR_AWARE_V2 = new(-4);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetProcessDpiAwarenessContext(IntPtr contexte);
+
+    /// <summary>
+    /// Déclare le processus sensible au DPI, par moniteur.
+    ///
+    /// Sans ça, Windows virtualise les coordonnées : sur un écran à 125 %,
+    /// GetWindowRect renvoie 2048 là où la fenêtre fait 2558 pixels réels.
+    /// Une région posée à partir de ces chiffres ampute la fenêtre d'un
+    /// cinquième — en pratique, la zone de notification disparaît.
+    ///
+    /// À appeler avant toute lecture de géométrie. Un échec signifie que le
+    /// contexte est déjà fixé, ce qui n'est pas un problème.
+    /// </summary>
+    internal static void DeclarerSensibleAuDpi() =>
+        SetProcessDpiAwarenessContext(PER_MONITOR_AWARE_V2);
+
     /// <summary>Invalide le cache d'icônes du shell.</summary>
     internal static void RefreshShellIcons() =>
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);

@@ -7,7 +7,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.8.3";
+    private const string Version = "0.9.2";
 
     private static readonly IThemeModule[] Modules =
     {
@@ -24,6 +24,11 @@ internal static class Program
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
 
+        // Avant toute lecture de géométrie : sans cette déclaration, Windows
+        // virtualise les coordonnées sur un écran mis à l'échelle et les
+        // régions de fenêtre sont posées de travers.
+        Kurogane.Native.NativeMethods.DeclarerSensibleAuDpi();
+
         if (args.Length == 0 || IsHelp(args[0])) { PrintUsage(); return 0; }
 
         try
@@ -38,6 +43,8 @@ internal static class Program
                 "probe-ownership" => CmdProbeOwnership(args),
                 "probe-mun" => CmdProbeMun(args),
                 "probe-taskbar" => CmdProbeTaskbar(),
+                "probe-taskbar-fenetres" => CmdProbeTaskbarFenetres(),
+                "taskbar-style" => CmdTaskbarStyle(args),
                 "probe-mun-ecriture" => CmdProbeMunEcriture(args),
                 "substituer-mun" => CmdSubstituerMun(args),
                 "restaurer-mun" => CmdRestaurerMun(args),
@@ -291,6 +298,41 @@ internal static class Program
     {
         using var journal = new Journal("probe-taskbar");
         return TaskbarProbe.Executer(journal);
+    }
+
+    private static int CmdProbeTaskbarFenetres()
+    {
+        using var journal = new Journal("probe-taskbar-fenetres");
+        return TaskbarWindowProbe.Executer(journal);
+    }
+
+    /// <summary>
+    /// Restylage à chaud. Pas de --commit : rien n'est écrit, et l'effet
+    /// disparaît de lui-même au redémarrage d'explorer.
+    /// </summary>
+    private static int CmdTaskbarStyle(string[] args)
+    {
+        using var journal = new Journal("taskbar-style");
+
+        if (Has(args, "--reinitialiser")) return TaskbarStyle.Reinitialiser(journal);
+
+        int Nombre(string nom, int defaut)
+        {
+            string? brut = Flag(args, nom);
+            return brut is not null && int.TryParse(brut, out int n) ? n : defaut;
+        }
+
+        string? teinte = Flag(args, "--teinte");
+
+        var reglage = new TaskbarStyle.Reglage(
+            MargeLaterale: Nombre("--marge", 12),
+            MargeBasse:    Nombre("--marge-basse", 6),
+            Rayon:         Nombre("--rayon", 10),
+            Teinte:        teinte is null ? null : ColorUtil.Parse(teinte),
+            Opacite:       (byte)Math.Clamp(Nombre("--opacite", 200), 0, 255),
+            Acrylique:     !Has(args, "--sans-acrylique"));
+
+        return TaskbarStyle.Appliquer(journal, reglage);
     }
 
     // --------------------------------------------- probe-mun-ecriture (A)
