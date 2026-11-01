@@ -59,8 +59,34 @@ kurogane restore --last
 kurogane restore --last --commit
 
 # Forcer le shell à relire les icônes
-kurogane refresh-icons           # notification + ie4uinit
+kurogane refresh-icons            # notification + ie4uinit
 kurogane refresh-icons --purge    # purge du cache, redémarre explorer
+```
+
+Restylage de la barre des tâches, à chaud et sans rien écrire :
+
+```
+kurogane taskbar-style --marge 12 --marge-basse 6 --rayon 10 --teinte "#C8102E"
+kurogane taskbar-style --reinitialiser
+```
+
+Substitution d'icônes dans un binaire du shell — voir *Niveau 3* plus bas :
+
+```
+kurogane substituer-mun --theme themes\kurogane-obsidian.json
+kurogane substituer-mun --theme themes\kurogane-obsidian.json --commit --autoriser-fichier-systeme
+kurogane restaurer-mun --commit
+kurogane etat-mun
+```
+
+Diagnostics, tous en lecture seule sauf `probe-icons` :
+
+```
+kurogane probe-taskbar              # inventaire des réglages de la barre
+kurogane probe-taskbar-fenetres     # hiérarchie des fenêtres de la barre
+kurogane probe-mun [--binaire <nom>]  # catalogue des icônes d'un binaire
+kurogane probe-mun-ecriture         # valide le graveur de ressources sur copie
+kurogane probe-icons [--commit]     # écrit une icône témoin dans les cibles candidates
 ```
 
 Un `.ico` remplacé sans changer de nom ne produit aucune modification de
@@ -194,10 +220,11 @@ Ce que l'outil fait, et ce qu'il ne fera pas :
 
 | | |
 |---|---|
-| **Niveau 1** — `HKCU`, sans élévation | mode sombre, accent, fond d'écran, curseurs, barre des tâches |
-| **Niveau 2** — `HKLM`, administrateur | substitution d'icônes système via `Shell Icons`, écran de verrouillage |
+| **Niveau 1** — `HKCU`, sans élévation | mode sombre, accent, fond d'écran, icônes du Bureau et des dossiers du profil, barre des tâches, menu Démarrer |
+| **Niveau 2** — `HKLM`, administrateur | dossier générique, lecteur, flèche de raccourci |
 | **Niveau 3** — commande séparée, double autorisation | substitution d'icônes dans `imageres.dll.mun` |
-| **Hors périmètre** | `.msstyles` personnalisé, patch d'`uxtheme.dll` |
+| **Hors thème** — à chaud, rien d'écrit | restylage de la fenêtre de la barre des tâches |
+| **Hors périmètre** | `.msstyles` personnalisé, patch d'`uxtheme.dll`, injection de code dans `explorer.exe` |
 
 Le niveau 3 n'est pas appelé par l'application d'un thème. Il existe parce que
 cinq entrées du shell — Documents, Images, Musique, Téléchargements, Vidéos
@@ -207,35 +234,22 @@ testées et écartées.
 Un `.msstyles` personnalisé reste hors périmètre : il demande de contourner la
 vérification de signature des thèmes, ce que ce projet ne fera pas.
 
-## Niveau 3 — prise de possession : disponible, non utilisé
+### Une impasse conservée comme outil de diagnostic
 
-Le dépôt contient `OwnershipChange` et `Privileges`, capables de prendre
-possession d'une clé de registre protégée et de restituer son descripteur de
-sécurité complet. **Aucun module de thème ne les appelle**, et ils ne sont
-atteignables que par la commande de diagnostic `probe-ownership`, qui exige
-deux autorisations explicites :
+`OwnershipChange` et `Privileges` savent prendre possession d'une clé de
+registre protégée et restituer son descripteur de sécurité. **Aucun module de
+thème ne les appelle** : ils ne servent que la commande `probe-ownership`, qui
+exige deux autorisations explicites.
 
-```
-kurogane probe-ownership --commit --autoriser-prise-de-possession
-```
+Ce code existe parce qu'on a d'abord cru que les icônes de l'Accès rapide
+venaient de clés protégées. Prendre possession de ces clés et y écrire une
+icône témoin n'a produit **aucun effet** — elles viennent d'ailleurs, d'où la
+voie du `.mun` décrite à la section suivante.
 
-Pourquoi ce code existe et pourquoi il ne sert pas : les six dossiers du
-profil affichés dans l'Accès rapide gardent leurs icônes Windows, et les clés
-qui semblaient les piloter sont protégées en écriture. L'hypothèse a été
-testée le 31/10/2026 en prenant possession des deux familles candidates
-(`SOFTWARE\Classes\CLSID\{CLSID}\DefaultIcon` et
-`...\Explorer\FolderDescriptions\{FOLDERID}\Icon`) et en y écrivant une icône
-témoin. **Aucun effet.** Ces icônes viennent d'ailleurs.
-
-Précision utile : ces clés appartiennent à `NT AUTHORITY\SYSTEM`, pas à
-TrustedInstaller. C'est la liste d'accès qui bloque l'écriture, TrustedInstaller
-y détenant le contrôle total. La formule courante « clés TrustedInstaller »
-confond propriété et droit d'écriture.
-
-Si tu envisages de réutiliser ce code : une mise à jour cumulative de Windows
-peut réécrire ces clés et réinitialiser leurs permissions, et un outil qui
-modifie la sécurité du système sur la machine d'un tiers est à considérer avec
-la plus grande prudence.
+Une précision qui revient souvent : ces clés appartiennent à
+`NT AUTHORITY\SYSTEM`, pas à TrustedInstaller. C'est la liste d'accès qui
+bloque l'écriture. Parler de « clés TrustedInstaller » confond propriété et
+droit d'écriture.
 
 ## Niveau 3 — substitution dans un binaire du shell
 
