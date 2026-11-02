@@ -1,0 +1,118 @@
+; Kurogane Obsidian - theme de contraste
+;
+; Seule voie documentee qui atteigne l'interieur de l'Explorateur de
+; Windows 11 : les 31 couleurs systeme ci-dessous sont lues par le shell,
+; par les controles Win32 et par WinUI. Aucune signature contournee,
+; aucun fichier systeme modifie.
+;
+; Reversible : Parametres > Accessibilite > Themes contrastes > Aucun,
+; ou l'application de n'importe quel autre theme.
+;
+; Les chemins sont absolus et visent le dossier de deploiement
+; C:\Kurogane. Meme dette technique que les icones du registre : a
+; deplacer vers %LOCALAPPDATA%\Kurogane avant tout empaquetage.
+
+[Theme]
+DisplayName=Kurogane Obsidian
+SetLogonBackground=0
+
+; Ce PC - SHIDI_SERVER
+[CLSID\{20D04FE0-3AEA-1069-A2D8-08002B30309D}\DefaultIcon]
+DefaultValue=C:\Kurogane\assets\icons\ce-pc.ico,0
+
+; Fichiers de l'utilisateur - SHIDI_USERFILES
+[CLSID\{59031A47-3F72-44A7-89C5-5595FE6B30EE}\DefaultIcon]
+DefaultValue=C:\Kurogane\assets\icons\utilisateur.ico,0
+
+; Reseau - SHIDI_MYNETWORK
+[CLSID\{F02C1A0D-BE21-4350-88B0-7367FC96EF3C}\DefaultIcon]
+DefaultValue=C:\Kurogane\assets\icons\reseau.ico,0
+
+; Corbeille - SHIDI_RECYCLERFULL SHIDI_RECYCLER
+[CLSID\{645FF040-5081-101B-9F08-00AA002F954E}\DefaultIcon]
+Full=C:\Kurogane\assets\icons\corbeille-pleine.ico,0
+Empty=C:\Kurogane\assets\icons\corbeille-vide.ico,0
+
+[Control Panel\Colors]
+; Fonds - Creux pour les listes, Surface pour les volets et barres d'outils
+Window=12 6 8
+ButtonFace=18 10 12
+Menu=18 10 12
+MenuBar=18 10 12
+Scrollbar=18 10 12
+InfoWindow=18 10 12
+AppWorkspace=8 5 6
+Background=8 5 6
+
+; Textes
+WindowText=244 240 241
+ButtonText=244 240 241
+MenuText=244 240 241
+InfoText=244 240 241
+GrayText=138 120 124
+
+; Selection et survol - la signature Arasaka
+Hilight=200 16 46
+HilightText=255 255 255
+MenuHilight=200 16 46
+HotTrackingColor=255 158 0
+
+; Cadres - rouge, en accord avec le lisere pose par les attributs DWM
+WindowFrame=200 16 46
+ActiveBorder=200 16 46
+InactiveBorder=36 18 22
+
+; Barres de titre classiques
+ActiveTitle=18 10 12
+TitleText=244 240 241
+InactiveTitle=12 6 8
+InactiveTitleText=138 120 124
+GradientActiveTitle=18 10 12
+GradientInactiveTitle=12 6 8
+
+; Reliefs des controles anciens
+ButtonShadow=36 18 22
+ButtonHilight=58 16 22
+ButtonDkShadow=8 5 6
+ButtonLight=36 18 22
+ButtonAlternateFace=36 18 22
+
+[Control Panel\Cursors]
+; Section obligatoire : sans elle, l'application du theme EFFACE les 17
+; entrees de curseurs au lieu de les laisser en place. Mesure par la sonde.
+; Valeurs reprises des themes de contraste livres par Windows.
+Arrow=%SystemRoot%\cursors\aero_arrow.cur
+Help=%SystemRoot%\cursors\aero_helpsel.cur
+AppStarting=%SystemRoot%\cursors\aero_working.ani
+Wait=%SystemRoot%\cursors\aero_busy.ani
+NWPen=%SystemRoot%\cursors\aero_pen.cur
+No=%SystemRoot%\cursors\aero_unavail.cur
+SizeNS=%SystemRoot%\cursors\aero_ns.cur
+SizeWE=%SystemRoot%\cursors\aero_ew.cur
+Crosshair=
+IBeam=
+SizeNWSE=%SystemRoot%\cursors\aero_nwse.cur
+SizeNESW=%SystemRoot%\cursors\aero_nesw.cur
+SizeAll=%SystemRoot%\cursors\aero_move.cur
+UpArrow=%SystemRoot%\cursors\aero_up.cur
+Hand=%SystemRoot%\cursors\aero_link.cur
+Link=
+DefaultValue=Windows Default
+
+[Control Panel\Desktop]
+; Redeclare explicitement : un theme de contraste vide cette valeur sinon,
+; et le fond d'ecran disparait.
+Wallpaper=C:\Kurogane\assets\wallpapers\Wallpaper_Kurogane.jpg
+TileWallpaper=0
+WallpaperStyle=10
+Pattern=
+
+[VisualStyles]
+; AeroLite est livre par Windows : on s'y raccroche, on ne le remplace pas.
+Path=%SystemRoot%\resources\themes\Aero\AeroLite.msstyles
+ColorStyle=NormalColor
+Size=NormalSize
+HighContrast=1
+
+[MasterThemeSelector]
+MTSM=RJSPBS

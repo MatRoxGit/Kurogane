@@ -54,6 +54,24 @@ dotnet build src/Kurogane/Kurogane.csproj -c Release
 
 Cible : `net8.0-windows`, x64. Aucun paquet NuGet.
 
+Pour produire le binaire autonome déployé sur la machine de test :
+
+```
+dotnet publish src/Kurogane/Kurogane.csproj -c Release -r win-x64 ^
+  --self-contained true -p:PublishSingleFile=true
+```
+
+**Le fichier à déployer est celui de `publish\`**, pas celui à côté des DLL :
+
+```
+src\Kurogane\bin\Release\net8.0-windows\win-x64\publish\kurogane.exe
+```
+
+Les deux dossiers contiennent un `kurogane.exe` et se ressemblent. Celui du
+dossier parent pèse environ 150 Ko et ne fonctionne qu'entouré de ses 250
+fichiers ; celui de `publish\` pèse environ 160 Mo et se suffit à lui-même.
+La taille est le moyen le plus rapide de ne pas se tromper.
+
 ## Utiliser
 
 ```

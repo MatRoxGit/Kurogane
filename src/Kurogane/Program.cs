@@ -8,7 +8,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.18.0";
+    private const string Version = "0.19.0";
 
     private static readonly IThemeModule[] Modules =
     {
@@ -50,6 +50,7 @@ internal static class Program
                 "resident" => CmdResident(args),
                 "barre" => CmdBarre(args),
                 "probe-chrome" => CmdProbeChrome(args),
+                "probe-contraste" => CmdProbeContraste(args),
                 "probe-mun-ecriture" => CmdProbeMunEcriture(args),
                 "substituer-mun" => CmdSubstituerMun(args),
                 "restaurer-mun" => CmdRestaurerMun(args),
@@ -462,6 +463,18 @@ internal static class Program
     private static string Couleur(Rgb? c) => c?.ToString() ?? "—";
 
     /// <summary>
+    /// Relève l'état des clés qu'un thème de contraste peut modifier, ou le
+    /// compare à un relevé antérieur. Lecture seule du registre : le seul
+    /// fichier écrit est le relevé lui-même, dans le dossier courant.
+    /// </summary>
+    private static int CmdProbeContraste(string[] args)
+    {
+        using var journal = new Journal("probe-contraste");
+        return ContrasteProbe.Executer(journal,
+            Flag(args, "--sortie"), Flag(args, "--comparer"));
+    }
+
+    /// <summary>
     /// Réglage de restylage, lu dans le thème puis surchargé par les options
     /// de la ligne de commande. Partagé par taskbar-style et resident, pour
     /// que les deux se comportent exactement pareil.
@@ -869,6 +882,16 @@ internal static class Program
                   avoir remplacé un .ico sans changer son nom : l'outil n'a
                   alors rien à modifier, mais le cache du shell est périmé.
                   --purge ferme l'Explorateur et supprime ses bases de cache.
+
+              probe-contraste [--sortie <fichier.json>]
+                              [--comparer <fichier.json>]
+                  Relève en entier les clés de registre qu'un thème de
+                  contraste peut modifier, et les range dans un fichier.
+                  Relancée avec --comparer, affiche l'écart avec un relevé
+                  antérieur en distinguant les valeurs modifiées, créées et
+                  supprimées — ce qui se défait par une réécriture de ce qui
+                  se défait par une suppression.
+                  Lecture seule du registre.
 
               probe-chrome --theme <fichier.json> [--secondes N]
                   Pose l'habillage des fenêtres et rapporte, pour chaque
