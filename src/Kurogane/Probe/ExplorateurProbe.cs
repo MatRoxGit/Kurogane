@@ -30,14 +30,22 @@ internal static class ExplorateurProbe
     /// Chemin de la surcharge utilisateur du gestionnaire de dossiers, par
     /// niveaux : il faut savoir lesquels on crée pour ne défaire que ceux-là.
     /// </summary>
-    private static readonly string[] Niveaux =
+    private static string[] Niveaux(string classe) => new[]
     {
         @"Software\Classes",
-        @"Software\Classes\Directory",
-        @"Software\Classes\Directory\shell",
-        @"Software\Classes\Directory\shell\open",
-        @"Software\Classes\Directory\shell\open\command",
+        $@"Software\Classes\{classe}",
+        $@"Software\Classes\{classe}\shell",
+        $@"Software\Classes\{classe}\shell\open",
+        $@"Software\Classes\{classe}\shell\open\command",
     };
+
+    /// <summary>
+    /// Les deux classes candidates. « Directory » est la classe d'un dossier
+    /// du système de fichiers, « Folder » celle de tout objet-dossier, y
+    /// compris ceux de l'espace de noms. Elles ne sont pas lues dans les
+    /// mêmes situations, et confondre les deux fait conclure à tort.
+    /// </summary>
+    private static readonly string[] Classes = { "Directory", "Folder" };
 
     /// <summary>
     /// Ce que l'essai écrit. Ce n'est pas un marqueur fantaisiste : c'est le
@@ -173,7 +181,7 @@ internal static class ExplorateurProbe
     /// </summary>
     internal static int Essai(Journal journal, bool commit)
     {
-        string chemin = Niveaux[^1];
+        string chemin = Niveaux("Directory")[^1];
 
         journal.Step("Essai d'écriture");
         journal.Info($"cible  : HKCU\\{chemin}");
@@ -192,14 +200,14 @@ internal static class ExplorateurProbe
 
         // Quels niveaux existent deja : on ne defera que ce qu'on aura cree.
         var aCreer = new List<string>();
-        foreach (var n in Niveaux)
+        foreach (var n in Niveaux("Directory"))
         {
             using var k = Registry.CurrentUser.OpenSubKey(n);
             if (k is null) aCreer.Add(n);
         }
 
         journal.Info($"{aCreer.Count} niveau(x) de clé à créer, "
-                   + $"{Niveaux.Length - aCreer.Count} déjà présent(s)");
+                   + $"{5 - aCreer.Count} déjà présent(s)");
         journal.Blank();
 
         string? relu;
@@ -306,13 +314,24 @@ internal static class ExplorateurProbe
     }
 
     /// <summary>
-    /// Essai fonctionnel : la surcharge est-elle réellement honorée par le
-    /// shell à l'ouverture d'un dossier ?
+    /// Essai fonctionnel : la surcharge est-elle réellement lue ?
     ///
-    /// L'essai d'écriture précédent prouve que la clé tient. Il ne prouve pas
-    /// que quelqu'un la lit. La différence a déjà coûté une conclusion fausse
+    /// L'essai d'écriture prouve que la clé tient. Il ne prouve pas que
+    /// quelqu'un la lise — la différence a déjà coûté une conclusion fausse
     /// sur les attributs DWM, où douze codes « ok » ne garantissaient rien à
     /// l'écran.
+    ///
+    /// Trois situations sont distinguées, parce qu'elles n'empruntent pas le
+    /// même chemin dans Windows :
+    ///
+    ///   1. ShellExecute sur un dossier — testé automatiquement, sans
+    ///      intervention humaine, donc sans erreur de manipulation possible.
+    ///   2. Le double-clic depuis le bureau — testé à la main.
+    ///   3. Win+E — testé à la main.
+    ///
+    /// Les deux classes « Directory » et « Folder » sont surchargées
+    /// ensemble : elles ne sont pas lues dans les mêmes situations, et n'en
+    /// surcharger qu'une ferait conclure à tort.
     /// </summary>
     internal static int Ouverture(Journal journal, bool commit)
     {
@@ -320,8 +339,8 @@ internal static class ExplorateurProbe
         string commande = $"\"{exe}\" preuve-ouverture \"%1\"";
 
         journal.Step("Essai d'ouverture");
-        journal.Info($"cible  : HKCU\\{Niveaux[^1]}");
         journal.Info($"valeur : {commande}");
+        journal.Info($"classes : {string.Join(", ", Classes)}");
         journal.Blank();
         journal.Info("Le relais note le chemin reçu, puis ouvre le dossier avec");
         journal.Info("l'Explorateur. Une surcharge oubliée en place ne casse donc");
@@ -335,88 +354,153 @@ internal static class ExplorateurProbe
             return 0;
         }
 
-        try { System.IO.File.Delete(CheminPreuve); } catch { }
+        Vider();
 
         var aCreer = new List<string>();
-        foreach (var n in Niveaux)
+
+        foreach (var classe in Classes)
         {
-            using var k = Registry.CurrentUser.OpenSubKey(n);
-            if (k is null) aCreer.Add(n);
+            foreach (var n in Niveaux(classe))
+            {
+                using var k = Registry.CurrentUser.OpenSubKey(n);
+                if (k is null && !aCreer.Contains(n)) aCreer.Add(n);
+            }
+
+            try
+            {
+                using var cle = Registry.CurrentUser.CreateSubKey(
+                    Niveaux(classe)[^1], writable: true);
+
+                if (cle is null)
+                {
+                    journal.Error($"{classe} : création refusée.");
+                    continue;
+                }
+
+                cle.SetValue(null, commande, RegistryValueKind.String);
+                journal.Ok($"{classe} : surcharge posée");
+            }
+            catch (Exception ex)
+            {
+                journal.Error($"{classe} : {ex.GetType().Name} — {ex.Message}");
+            }
         }
+
+        journal.Blank();
+
+        // ---- 1. ShellExecute, sans intervention humaine
+        journal.Step("1. ShellExecute sur un dossier");
+
+        string dossier = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        journal.Info($"cible : {dossier}");
 
         try
         {
-            using var cle = Registry.CurrentUser.CreateSubKey(Niveaux[^1], writable: true);
-            if (cle is null)
-            {
-                journal.Error("Création de la clé refusée.");
-                return 1;
-            }
-
-            cle.SetValue(null, commande, RegistryValueKind.String);
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(dossier) { UseShellExecute = true });
         }
         catch (Exception ex)
         {
             journal.Error($"{ex.GetType().Name} : {ex.Message}");
-            Nettoyer(journal, aCreer);
-            return 1;
         }
 
-        journal.Ok("surcharge posée");
+        bool viaShellExecute = Attendre(TimeSpan.FromSeconds(4));
+
+        if (viaShellExecute) journal.Ok("le relais a été appelé");
+        else                 journal.Warn("aucune trace — la surcharge n'a pas été lue");
+
+        Vider();
         journal.Blank();
-        journal.Step("À toi de jouer");
-        journal.Info("Ouvre un dossier par double-clic — depuis le bureau, pas");
-        journal.Info("depuis une fenêtre d'Explorateur déjà ouverte.");
-        journal.Info("Puis reviens ici et appuie sur Entrée.");
+
+        // ---- 2 et 3. Les chemins qui demandent une main humaine
+        journal.Step("2. Double-clic depuis le bureau");
+        journal.Info("Ouvre un dossier par double-clic depuis le BUREAU — pas");
+        journal.Info("depuis une fenêtre d'Explorateur déjà ouverte, qui navigue");
+        journal.Info("en interne sans repasser par le verbe « open ».");
+        journal.Info("Puis Entrée.");
 
         if (!Console.IsInputRedirected) Console.ReadLine();
 
+        bool viaDoubleClic = Lire() is not null;
+        if (viaDoubleClic) journal.Ok("le relais a été appelé");
+        else               journal.Warn("aucune trace");
+
+        Vider();
         journal.Blank();
-        journal.Step("Preuve");
 
-        string? trace = null;
-        try
-        {
-            if (System.IO.File.Exists(CheminPreuve))
-                trace = System.IO.File.ReadAllText(CheminPreuve).Trim();
-        }
-        catch (Exception ex)
-        {
-            journal.Error($"lecture de la preuve : {ex.Message}");
-        }
+        journal.Step("3. Win+E");
+        journal.Info("Appuie sur Win+E, puis reviens ici et Entrée.");
 
-        bool honoree = !string.IsNullOrWhiteSpace(trace);
+        if (!Console.IsInputRedirected) Console.ReadLine();
 
-        if (honoree)
-        {
-            journal.Ok("Le shell a appelé notre commande.");
-            foreach (var l in trace!.Split('\n')) journal.Info("  " + l.TrimEnd('\r'));
-        }
-        else
-        {
-            journal.Warn("Aucune trace : le shell a ignoré la surcharge.");
-            journal.Info($"attendu dans : {CheminPreuve}");
-        }
+        bool viaWinE = Lire() is not null;
+        if (viaWinE) journal.Ok("le relais a été appelé");
+        else         journal.Warn("aucune trace");
 
         Nettoyer(journal, aCreer);
 
+        // ---- Verdict
+        journal.Blank();
+        journal.Step("Verdict");
+        journal.Info($"  ShellExecute        : {(viaShellExecute ? "lue" : "ignorée")}");
+        journal.Info($"  double-clic bureau  : {(viaDoubleClic ? "lue" : "ignorée")}");
+        journal.Info($"  Win+E               : {(viaWinE ? "lue" : "ignorée")}");
         journal.Blank();
 
-        if (honoree)
+        if (viaDoubleClic)
         {
-            journal.Info("Voie du remplacement : confirmée de bout en bout.");
-            journal.Info("L'explorateur Kurogane pourra devenir le gestionnaire");
-            journal.Info("de dossiers par défaut, de façon réversible.");
+            journal.Info("Voie du remplacement : confirmée pour l'usage courant.");
+        }
+        else if (viaShellExecute)
+        {
+            journal.Info("La surcharge est lue par ShellExecute mais pas par le");
+            journal.Info("double-clic : celui-ci est traité en interne par l'espace");
+            journal.Info("de noms du shell, ce que laissait déjà penser le verbe");
+            journal.Info("par défaut « none » relevé sur Directory\\shell.");
+            journal.Info("Remplacer l'Explorateur demanderait alors d'intervenir");
+            journal.Info("dans cet espace de noms, pas dans les associations.");
         }
         else
         {
-            journal.Info("La clé est acceptée mais pas lue pour ce verbe. Il faudra");
-            journal.Info("chercher ailleurs — ou accepter une application lancée à");
-            journal.Info("la main. Ne pas conclure sur un seul essai : refaire le");
-            journal.Info("test depuis le bureau et depuis Win+E.");
+            journal.Info("Aucun des trois chemins ne lit la surcharge. Les");
+            journal.Info("associations ne gouvernent pas l'ouverture d'un dossier");
+            journal.Info("sur cette version de Windows.");
         }
 
         return 0;
+    }
+
+    private static void Vider()
+    {
+        try { System.IO.File.Delete(CheminPreuve); } catch { }
+    }
+
+    private static string? Lire()
+    {
+        try
+        {
+            if (!System.IO.File.Exists(CheminPreuve)) return null;
+            var t = System.IO.File.ReadAllText(CheminPreuve).Trim();
+            return string.IsNullOrWhiteSpace(t) ? null : t;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Attend qu'une trace apparaisse. Le relais est un processus séparé :
+    /// lire tout de suite reviendrait à conclure avant qu'il ait démarré.
+    /// </summary>
+    private static bool Attendre(TimeSpan limite)
+    {
+        var fin = DateTime.UtcNow + limite;
+
+        while (DateTime.UtcNow < fin)
+        {
+            if (Lire() is not null) return true;
+            System.Threading.Thread.Sleep(150);
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -432,7 +516,7 @@ internal static class ExplorateurProbe
             journal.Warn("Aucun niveau créé par l'essai — la clé préexistait.");
             journal.Warn("La valeur écrite n'est PAS défaite automatiquement :");
             journal.Warn("supprimer à la main la valeur par défaut de");
-            journal.Warn($"HKCU\\{Niveaux[^1]} si elle n'y était pas.");
+            journal.Warn($"HKCU\\{Niveaux("Directory")[^1]} si elle n'y était pas.");
             return;
         }
 
@@ -449,8 +533,19 @@ internal static class ExplorateurProbe
             }
         }
 
-        using var reste = Registry.CurrentUser.OpenSubKey(Niveaux[^1]);
-        if (reste is null) journal.Ok("état d'origine rétabli");
-        else               journal.Error("la clé subsiste — à vérifier à la main");
+        // Verifier les deux classes : l'essai d'ouverture en surcharge deux,
+        // et ne controler que la premiere laisserait l'autre passer.
+        bool propre = true;
+
+        foreach (var classe in Classes)
+        {
+            using var reste = Registry.CurrentUser.OpenSubKey(Niveaux(classe)[^1]);
+            if (reste is null) continue;
+
+            propre = false;
+            journal.Error($"subsiste : HKCU\\{Niveaux(classe)[^1]} — à vérifier à la main");
+        }
+
+        if (propre) journal.Ok("état d'origine rétabli");
     }
 }
