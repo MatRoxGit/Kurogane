@@ -8,7 +8,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.20.0";
+    private const string Version = "0.22.0";
 
     private static readonly IThemeModule[] Modules =
     {
@@ -52,6 +52,7 @@ internal static class Program
                 "probe-chrome" => CmdProbeChrome(args),
                 "probe-contraste" => CmdProbeContraste(args),
                 "contraste" => CmdContraste(args),
+                "probe-explorateur" => CmdProbeExplorateur(),
                 "probe-mun-ecriture" => CmdProbeMunEcriture(args),
                 "substituer-mun" => CmdSubstituerMun(args),
                 "restaurer-mun" => CmdRestaurerMun(args),
@@ -462,6 +463,16 @@ internal static class Program
     }
 
     private static string Couleur(Rgb? c) => c?.ToString() ?? "—";
+
+    /// <summary>
+    /// Sonde la faisabilité du remplacement de l'Explorateur comme
+    /// gestionnaire de dossiers. Lecture seule.
+    /// </summary>
+    private static int CmdProbeExplorateur()
+    {
+        using var journal = new Journal("probe-explorateur");
+        return ExplorateurProbe.Executer(journal);
+    }
 
     /// <summary>
     /// Produit et applique le thème de contraste décrit par le fichier de
@@ -982,6 +993,13 @@ internal static class Program
                   native, que Windows expose dans les Paramètres. Les .theme
                   livrés par Windows ne sont pas touchés.
                   Sans --commit, le fichier est affiché, pas écrit.
+
+              probe-explorateur
+                  Relève qui ouvre un dossier aujourd'hui, où c'est écrit, et
+                  si le User Choice Protection Driver intercepte les
+                  associations. Décide si l'explorateur Kurogane pourra un
+                  jour remplacer celui de Windows ou restera une application
+                  lancée à la main. Lecture seule.
 
               probe-contraste [--sortie <fichier.json>]
                               [--comparer <fichier.json>]

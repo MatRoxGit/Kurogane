@@ -158,6 +158,27 @@ public static class ContrasteTheme
         b.AppendLine($"Path={StyleVisuel}");
         b.AppendLine("ColorStyle=NormalColor");
         b.AppendLine("Size=NormalSize");
+
+        // Les quatre entrees qui suivent sont reprises d'aero.theme, livre par
+        // Windows. Sans elles, le moteur de themes ecrase le mode sombre et
+        // l'accent, qu'il fallait alors reposer par un apply apres coup.
+        //
+        // AutoColorization=0 empeche en plus Windows de rederiver l'accent
+        // depuis le fond d'ecran.
+        b.AppendLine("AutoColorization=0");
+
+        if (theme.Accent is { Color.Length: > 0 } accent)
+        {
+            // 0XAARRGGBB, alpha 0xC4 : la forme qu'ecrit Windows lui-meme, et
+            // celle que pose deja le module d'accent.
+            int argb = ColorUtil.ToArgb(ColorUtil.Parse(accent.Color));
+            b.AppendLine($"ColorizationColor=0X{argb:X8}");
+        }
+
+        bool sombre = theme.DarkMode?.Apps ?? true;
+        b.AppendLine($"SystemMode={(sombre ? "Dark" : "Light")}");
+        b.AppendLine($"AppMode={(sombre ? "Dark" : "Light")}");
+
         b.AppendLine("HighContrast=1");
         b.AppendLine();
 
