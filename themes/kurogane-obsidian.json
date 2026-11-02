@@ -1,6 +1,6 @@
 ﻿{
   "name": "Kurogane Obsidian",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "author": "Mathieu",
   "darkMode": {
     "apps": true,
@@ -79,6 +79,18 @@
         "icone": "reseau.ico"
       }
     ]
+  },
+  "contraste": {
+    "fond": "#080506",
+    "listes": "#0C0608",
+    "surface": "#120A0C",
+    "relief": "#241216",
+    "texte": "#F4F0F1",
+    "texteEteint": "#8A787C",
+    "selection": "#C8102E",
+    "texteSelection": "#FFFFFF",
+    "survol": "#FF9E00",
+    "cadre": "#C8102E"
   },
   "fenetres": {
     "coinsCarres": true,

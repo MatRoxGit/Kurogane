@@ -74,6 +74,13 @@ public sealed class ChangeRecord
     /// changé, mais le point de restauration enfle et le plan devient
     /// illisible.
     ///
+    /// Même raison pour l'index de ressource : « x.ico » et « x.ico,0 »
+    /// désignent la même image, l'index 0 étant implicite. Le moteur de
+    /// thèmes de Windows écrit la forme courte quand un .theme est appliqué,
+    /// alors que notre module d'icônes écrit la forme longue — mesuré, pas
+    /// supposé. Sans cette nuance, chaque application d'un thème de contraste
+    /// laisse six modifications d'icônes à refaire pour rien.
+    ///
     /// La tolérance est volontairement étroite : elle ne s'applique que si les
     /// DEUX valeurs contiennent un chemin absolu. Partout ailleurs, la
     /// comparaison reste octet pour octet.
@@ -85,8 +92,16 @@ public sealed class ChangeRecord
 
         if (!CheminWindows.IsMatch(avant) || !CheminWindows.IsMatch(apres)) return false;
 
-        return string.Equals(avant, apres, StringComparison.OrdinalIgnoreCase);
+        return string.Equals(SansIndexZero(avant), SansIndexZero(apres),
+            StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// Retire un « ,0 » final. Seulement zéro : « x.dll,-109 » désigne une
+    /// autre ressource et doit rester distinct.
+    /// </summary>
+    private static string SansIndexZero(string v) =>
+        v.EndsWith(",0", StringComparison.Ordinal) ? v[..^2] : v;
 
     /// <summary>Rendu lisible pour le plan et le journal.</summary>
     public string Render()

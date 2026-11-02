@@ -457,14 +457,74 @@ choix à Windows (`DWMWA_COLOR_DEFAULT`), pas rejouer une valeur capturée comme
 le fait le socle de registre. C'est une limite de l'API, sans conséquence ici
 puisque rien n'est écrit et qu'une fenêtre fermée emporte son habillage.
 
+## L'intérieur de l'Explorateur — thème de contraste
+
+Les attributs DWM ci-dessus s'arrêtent à l'enveloppe des fenêtres. L'intérieur
+de l'Explorateur de Windows 11 est dessiné par WinUI, qui lit ses couleurs
+dans ses propres ressources. Un seul mécanisme documenté l'atteint : le
+**thème de contraste**, dont les trente-et-une couleurs système sont lues par
+le shell, par les contrôles Win32 **et** par WinUI.
+
+```
+kurogane contraste --theme themes\kurogane-obsidian.json
+kurogane contraste --theme themes\kurogane-obsidian.json --commit
+kurogane apply --theme themes\kurogane-obsidian.json --commit
+```
+
+Le fichier `.theme` est produit à partir de la section `contraste` du thème,
+décrite en **rôles** — `listes`, `surface`, `selection`, `survol`, `cadre` —
+et traduite vers les noms hérités de Windows au moment de l'écriture. Dix
+valeurs lisibles plutôt que trente-et-une obscures.
+
+Il pointe sur `AeroLite.msstyles`, livré par Windows : on s'y raccroche, on ne
+le remplace pas. Aucune signature contournée, aucun fichier système modifié.
+
+### Pourquoi hors du socle
+
+C'est la seule fonction du projet qui n'écrit pas par le socle de registre, et
+c'est assumé. Le socle existe parce qu'une écriture de registre n'a pas
+d'annulation native. **Un thème en a une** : Paramètres, Accessibilité, Thèmes
+contrastés, Aucun — documentée, supportée, accessible à l'utilisateur. Le
+principe du projet est « rien d'irréversible », pas « tout passe par le
+socle ». Les `.theme` livrés par Windows ne sont pas touchés ; le nôtre est
+écrit dans `%LOCALAPPDATA%\Microsoft\Windows\Themes`, et Windows garde
+lui-même la trace du thème précédent.
+
+La simulation reste le défaut : sans `--commit`, le fichier est affiché, pas
+écrit.
+
+### Trois choses mesurées, pas supposées
+
+**La section `[Control Panel\Cursors]` est obligatoire.** Son absence ne
+laisse pas les curseurs en place : Windows efface les dix-sept entrées
+existantes. Les thèmes livrés par Microsoft portent cette section pour cette
+raison.
+
+**Le fond d'écran doit être redéclaré.** Un thème de contraste vide
+`Control Panel\Desktop\WallPaper` s'il ne le mentionne pas — c'est ce que
+font les thèmes d'accessibilité livrés.
+
+**Les icônes de bureau sont portées par le `.theme`.** Sans ses sections
+`CLSID\{...}\DefaultIcon`, l'application du thème les ferait retomber sur
+`imageres.dll`.
+
+### Ce qu'il faut reposer après
+
+Le moteur de thèmes écrase `AppsUseLightTheme` et la colorisation DWM.
+`kurogane apply --commit` les repose, et la commande le rappelle en partant.
+Trois valeurs de colorisation — `ColorizationBlurBalance`,
+`ColorizationColorBalance`, `ColorizationGlassAttribute` — ne sont pas encore
+couvertes par le module d'accent : elles restent à la valeur posée par le
+thème.
+
 ## État
 
-v0.18.0 — mode sombre, accent, fond d'écran, 15 icônes réparties sur trois
+v0.20.0 — mode sombre, accent, fond d'écran, 15 icônes réparties sur trois
 mécanismes (registre utilisateur, registre machine, `desktop.ini`), barre des
 tâches et menu Démarrer. Plus, en commandes séparées : la substitution de
 ressources dans `imageres.dll.mun` pour les cinq entrées de l'Accès rapide,
-la barre des tâches de remplacement, et l'habillage des fenêtres par
-attributs DWM.
+la barre des tâches de remplacement, l'habillage des fenêtres par attributs
+DWM, et le thème de contraste qui atteint l'intérieur de l'Explorateur.
 
 ### Deux limites constatées, non contournables
 

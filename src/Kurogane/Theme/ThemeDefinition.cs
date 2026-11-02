@@ -19,6 +19,7 @@ public sealed class ThemeDefinition
     public TaskbarStyleSection? TaskbarStyle { get; set; }
     public BarreSection?    Barre     { get; set; }
     public FenetresSection? Fenetres  { get; set; }
+    public ContrasteSection? Contraste { get; set; }
 
     /// <summary>Dossier d'où le thème a été chargé — sert à résoudre les chemins relatifs.</summary>
     [JsonIgnore]
@@ -175,6 +176,43 @@ public sealed class FenetresSection
 
     /// <summary>Couleur du liseré de fenêtre, au format #RRGGBB.</summary>
     public string? Bordure { get; set; }
+}
+
+/// <summary>
+/// Palette du thème de contraste, décrite par rôles plutôt que par les
+/// trente-et-un noms de couleurs hérités de Windows 3.1.
+///
+/// Un thème de contraste est la seule voie documentée qui atteigne
+/// l'intérieur de l'Explorateur de Windows 11 : ses couleurs sont lues par
+/// le shell, par les contrôles Win32 et par WinUI. Les rôles ci-dessous sont
+/// traduits vers les noms attendus par Windows au moment de l'écriture du
+/// fichier .theme.
+/// </summary>
+public sealed class ContrasteSection
+{
+    /// <summary>Bureau et arrière-plans les plus profonds.</summary>
+    public string Fond { get; set; } = "#080506";
+
+    /// <summary>Fond des listes — la zone de fichiers de l'Explorateur.</summary>
+    public string Listes { get; set; } = "#0C0608";
+
+    /// <summary>Volets, barres d'outils, menus, ascenseurs.</summary>
+    public string Surface { get; set; } = "#120A0C";
+
+    /// <summary>Reliefs et séparateurs des contrôles anciens.</summary>
+    public string Relief { get; set; } = "#241216";
+
+    public string Texte { get; set; } = "#F4F0F1";
+    public string TexteEteint { get; set; } = "#8A787C";
+
+    public string Selection { get; set; } = "#C8102E";
+    public string TexteSelection { get; set; } = "#FFFFFF";
+
+    /// <summary>Survol — lien pointé, élément sous le curseur.</summary>
+    public string Survol { get; set; } = "#FF9E00";
+
+    /// <summary>Cadre de fenêtre, en accord avec le liseré posé par DWM.</summary>
+    public string Cadre { get; set; } = "#C8102E";
 }
 
 public sealed class TaskbarStyleSection

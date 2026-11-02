@@ -8,7 +8,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.19.0";
+    private const string Version = "0.20.0";
 
     private static readonly IThemeModule[] Modules =
     {
@@ -51,6 +51,7 @@ internal static class Program
                 "barre" => CmdBarre(args),
                 "probe-chrome" => CmdProbeChrome(args),
                 "probe-contraste" => CmdProbeContraste(args),
+                "contraste" => CmdContraste(args),
                 "probe-mun-ecriture" => CmdProbeMunEcriture(args),
                 "substituer-mun" => CmdSubstituerMun(args),
                 "restaurer-mun" => CmdRestaurerMun(args),
@@ -461,6 +462,93 @@ internal static class Program
     }
 
     private static string Couleur(Rgb? c) => c?.ToString() ?? "—";
+
+    /// <summary>
+    /// Produit et applique le thème de contraste décrit par le fichier de
+    /// thème. Hors du socle de registre, et c'est assumé : un thème possède
+    /// une annulation native que Windows expose à l'utilisateur. La
+    /// simulation reste le défaut.
+    /// </summary>
+    private static int CmdContraste(string[] args)
+    {
+        using var journal = new Journal("contraste");
+
+        bool commit = args.Contains("--commit");
+
+        if (args.Contains("--retirer"))
+        {
+            journal.Step("Retrait");
+
+            if (!commit)
+            {
+                journal.Info("Simulation : le thème sombre de Windows serait appliqué.");
+                journal.Info("Ajouter --commit pour le faire.");
+                return 0;
+            }
+
+            ContrasteTheme.Retirer();
+            journal.Ok("Thème sombre de Windows appliqué.");
+            journal.Blank();
+            journal.Info("L'accent et le fond d'écran de Kurogane sont à reposer :");
+            journal.Info("  kurogane apply --theme <fichier.json> --commit");
+            return 0;
+        }
+
+        string? chemin = Flag(args, "--theme");
+
+        if (chemin is null)
+        {
+            Console.Error.WriteLine("Usage : kurogane contraste --theme <fichier.json> "
+                                  + "[--commit]");
+            Console.Error.WriteLine("        kurogane contraste --retirer [--commit]");
+            return 2;
+        }
+
+        var theme = ThemeDefinition.Load(chemin);
+        journal.Info($"thème « {theme.Name} » v{theme.Version}");
+
+        if (theme.Contraste is null)
+            journal.Warn("ce thème ne déclare pas de section « contraste » : "
+                       + "la palette par défaut s'applique");
+
+        journal.Blank();
+
+        string contenu = ContrasteTheme.Generer(theme);
+        string cible   = ContrasteTheme.Destination(theme);
+
+        journal.Step("Fichier produit");
+        journal.Info($"destination : {cible}");
+        journal.Blank();
+
+        foreach (var ligne in contenu.Split('\n'))
+            journal.Info("  " + ligne.TrimEnd('\r'));
+
+        journal.Blank();
+
+        if (!commit)
+        {
+            journal.Step("Simulation");
+            journal.Info("Rien n'a été écrit. Ajouter --commit pour écrire et appliquer.");
+            return 0;
+        }
+
+        journal.Step("Application");
+        ContrasteTheme.Ecrire(cible, contenu);
+        journal.Ok($"écrit : {cible}");
+
+        ContrasteTheme.Lancer(cible);
+        journal.Ok("thème lancé — les Paramètres s'ouvrent et l'appliquent");
+
+        journal.Blank();
+        journal.Info("Les .theme livrés par Windows ne sont pas touchés.");
+        journal.Info("Retrait : Paramètres > Accessibilité > Thèmes contrastés > Aucun,");
+        journal.Info("ou : kurogane contraste --retirer --commit");
+        journal.Blank();
+        journal.Warn("L'accent et le mode sombre des applications sont écrasés par");
+        journal.Warn("le moteur de thèmes. Les reposer : kurogane apply --commit");
+
+        return 0;
+    }
 
     /// <summary>
     /// Relève l'état des clés qu'un thème de contraste peut modifier, ou le
@@ -882,6 +970,18 @@ internal static class Program
                   avoir remplacé un .ico sans changer son nom : l'outil n'a
                   alors rien à modifier, mais le cache du shell est périmé.
                   --purge ferme l'Explorateur et supprime ses bases de cache.
+
+              contraste --theme <fichier.json> [--commit]
+              contraste --retirer [--commit]
+                  Produit le thème de contraste décrit par la section
+                  « contraste » du fichier de thème, et l'applique. C'est la
+                  seule voie documentée qui atteigne l'intérieur de
+                  l'Explorateur de Windows 11 : ses couleurs sont lues par le
+                  shell, par les contrôles Win32 et par WinUI.
+                  Hors du socle de registre : un thème possède une annulation
+                  native, que Windows expose dans les Paramètres. Les .theme
+                  livrés par Windows ne sont pas touchés.
+                  Sans --commit, le fichier est affiché, pas écrit.
 
               probe-contraste [--sortie <fichier.json>]
                               [--comparer <fichier.json>]
