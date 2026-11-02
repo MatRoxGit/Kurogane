@@ -8,7 +8,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.22.0";
+    private const string Version = "0.24.0";
 
     private static readonly IThemeModule[] Modules =
     {
@@ -52,7 +52,11 @@ internal static class Program
                 "probe-chrome" => CmdProbeChrome(args),
                 "probe-contraste" => CmdProbeContraste(args),
                 "contraste" => CmdContraste(args),
-                "probe-explorateur" => CmdProbeExplorateur(),
+                "probe-explorateur" => CmdProbeExplorateur(args),
+                // Relais appele par le shell pendant l'essai d'ouverture.
+                // Sans journal : il doit etre invisible et rapide.
+                "preuve-ouverture" => ExplorateurProbe.Preuve(
+                    args.Length > 1 ? args[1] : null),
                 "probe-mun-ecriture" => CmdProbeMunEcriture(args),
                 "substituer-mun" => CmdSubstituerMun(args),
                 "restaurer-mun" => CmdRestaurerMun(args),
@@ -468,9 +472,18 @@ internal static class Program
     /// Sonde la faisabilité du remplacement de l'Explorateur comme
     /// gestionnaire de dossiers. Lecture seule.
     /// </summary>
-    private static int CmdProbeExplorateur()
+    private static int CmdProbeExplorateur(string[] args)
     {
         using var journal = new Journal("probe-explorateur");
+
+        bool commit = args.Contains("--commit");
+
+        if (args.Contains("--ouverture"))
+            return ExplorateurProbe.Ouverture(journal, commit);
+
+        if (args.Contains("--essai"))
+            return ExplorateurProbe.Essai(journal, commit);
+
         return ExplorateurProbe.Executer(journal);
     }
 
@@ -994,12 +1007,22 @@ internal static class Program
                   livrés par Windows ne sont pas touchés.
                   Sans --commit, le fichier est affiché, pas écrit.
 
-              probe-explorateur
+              probe-explorateur [--essai | --ouverture [--commit]]
                   Relève qui ouvre un dossier aujourd'hui, où c'est écrit, et
                   si le User Choice Protection Driver intercepte les
                   associations. Décide si l'explorateur Kurogane pourra un
                   jour remplacer celui de Windows ou restera une application
                   lancée à la main. Lecture seule.
+                  --essai écrit une surcharge utilisateur, la relit et la
+                  défait, pour savoir si le pilote intercepte cette clé — son
+                  état seul ne le dit pas. La valeur écrite reproduit le
+                  comportement actuel de Windows : un nettoyage manqué ne
+                  casserait rien. Sans --commit, rien n'est écrit.
+                  --ouverture va plus loin : elle fait pointer la surcharge
+                  sur Kurogane, attend que tu ouvres un dossier, et vérifie
+                  que le shell a bien appelé notre commande. Une clé acceptée
+                  n'est pas une clé lue. Le relais rouvre le dossier avec
+                  l'Explorateur, donc une surcharge oubliée ne casse rien.
 
               probe-contraste [--sortie <fichier.json>]
                               [--comparer <fichier.json>]
