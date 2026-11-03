@@ -17,6 +17,8 @@ plus bas.
 
 ## Aperçu
 
+![L'explorateur Kurogane](docs/apercu-explorateur.png)
+
 ![Le bureau sous le thème Obsidian](docs/apercu-bureau.png)
 
 La barre Kurogane, en détail :
@@ -93,11 +95,24 @@ kurogane refresh-icons            # notification + ie4uinit
 kurogane refresh-icons --purge    # purge du cache, redémarre explorer
 ```
 
+Ouvrir l'explorateur Kurogane :
+
+```
+kurogane explorateur
+kurogane explorateur C:\Windows\System32 --theme themes\kurogane-obsidian.json
+```
+
 Remplacer la barre des tâches et habiller les fenêtres, à chaud :
 
 ```
 kurogane barre --theme themes\kurogane-obsidian.json
 kurogane probe-chrome --theme themes\kurogane-obsidian.json
+```
+
+Vérifier que le pack d'icônes et le projet sont d'accord :
+
+```
+kurogane probe-pack --theme themes\kurogane-obsidian.json
 ```
 
 Restylage de la barre des tâches, à chaud et sans rien écrire :
@@ -189,14 +204,17 @@ l'élévation ne la garantissant pas.
 
 La section `icons` accepte quinze entrées ; l'exemple n'en montre que six.
 
-Quatre sections supplémentaires, facultatives, n'interviennent pas dans
-`apply` : elles décrivent des effets posés à chaud, qui n'écrivent rien.
+Cinq sections supplémentaires, facultatives, n'interviennent pas dans
+`apply` : elles décrivent des effets posés à chaud ou l'apparence de
+fenêtres que Kurogane dessine lui-même.
 
-| Section        | Lue par                   | Contenu                                           |
-| -------------- | ------------------------- | ------------------------------------------------- |
+| Section        | Lue par                     | Contenu |
+| -------------- | --------------------------- | ------- |
 | `taskbarStyle` | `taskbar-style`, `resident` | marges, rayon, teinte et opacité de la barre Windows |
-| `barre`        | `barre`                   | nœud, état, suffixe de date et épingles de la barre Kurogane |
-| `fenetres`     | `barre`, `probe-chrome`   | `coinsCarres`, `barreTitre`, `texteTitre`, `bordure` |
+| `barre`        | `barre`                     | nœud, état, suffixe de date et épingles de la barre Kurogane |
+| `fenetres`     | `barre`, `probe-chrome`     | `coinsCarres`, `barreTitre`, `texteTitre`, `bordure` |
+| `contraste`    | `contraste`                 | la palette du thème de contraste, décrite en rôles |
+| `explorateur`  | `explorateur`               | `ouvertureSimpleClic` |
 
 ```json
 "fenetres": {
@@ -517,14 +535,75 @@ Trois valeurs de colorisation — `ColorizationBlurBalance`,
 couvertes par le module d'accent : elles restent à la valeur posée par le
 thème.
 
+## L'explorateur Kurogane
+
+```
+kurogane explorateur [<dossier>] [--theme <fichier.json>]
+```
+
+Le thème de contraste atteint l'intérieur de l'Explorateur de Windows, mais
+s'arrête aux couleurs. La disposition, le contenu et les éléments d'une
+fenêtre appartiennent à l'application qui la dessine. Kurogane écrit donc la
+sienne.
+
+**Lecture seule à ce stade** : on liste, on navigue, on ouvre avec
+l'application système. Rien n'est créé, renommé ni supprimé.
+
+Navigation au clavier et à la souris, sélection simple et multiple,
+arborescence dépliable à chargement différé, filtre instantané sur le nom ou
+l'extension, tri par nom, taille, date ou type, volets redimensionnables, et
+les icônes du pack Kurogane par extension.
+
+### Mesurer avant d'optimiser
+
+La barre d'état affiche les temps de lecture et de rendu. Ce n'est pas un
+ornement : c'est ce qui a décidé de la virtualisation. Sur
+`C:\Windows\System32` et ses 4686 entrées, le rendu coûtait 671 ms contre
+65 ms de lecture — le problème n'était pas le disque mais l'instanciation de
+4686 contrôles. Après virtualisation, 47 ms.
+
+Le chargement progressif, prévu comme chantier suivant, a été abandonné pour
+la même raison : une fois le rendu dégonflé, l'attente n'était plus
+perceptible.
+
+### La règle du gabarit
+
+**Tout contrôle standard ajouté à l'interface doit porter son propre
+`ControlTemplate`.**
+
+Sous un thème de contraste, WPF bascule sur ses gabarits d'accessibilité,
+qui redessinent bordures et fonds depuis les couleurs système — `WindowText`
+vaut presque blanc dans le thème Kurogane. `BorderThickness="0"` n'y change
+rien : c'est tout le gabarit qui est remplacé.
+
+Découvert sur un cadre blanc autour du champ de filtre. Six contrôles ont dû
+être regabarités depuis : `TextBox`, `TreeViewItem`, `ToggleButton`,
+`ScrollBar`, `RadioButton`, `GridSplitter`.
+
+### Ce qui manque
+
+Clic droit, actions sur les fichiers, recherche récursive. L'étape des
+actions est la plus délicate du projet : « rien d'irréversible » y cessera
+de parler de clés de registre pour parler des fichiers de l'utilisateur —
+corbeille et jamais suppression définitive, aucun écrasement silencieux,
+aucune opération de masse sans confirmation.
+
 ## État
 
-v0.20.0 — mode sombre, accent, fond d'écran, 15 icônes réparties sur trois
+v0.42.0 — mode sombre, accent, fond d'écran, 15 icônes réparties sur trois
 mécanismes (registre utilisateur, registre machine, `desktop.ini`), barre des
-tâches et menu Démarrer. Plus, en commandes séparées : la substitution de
-ressources dans `imageres.dll.mun` pour les cinq entrées de l'Accès rapide,
-la barre des tâches de remplacement, l'habillage des fenêtres par attributs
-DWM, et le thème de contraste qui atteint l'intérieur de l'Explorateur.
+tâches et menu Démarrer.
+
+En commandes séparées : la substitution de ressources dans
+`imageres.dll.mun` pour les cinq entrées de l'Accès rapide, la barre des
+tâches de remplacement, l'habillage des fenêtres par attributs DWM, le thème
+de contraste qui atteint l'intérieur de l'Explorateur, et l'explorateur
+Kurogane en lecture seule.
+
+Le pack compte 71 icônes, en noms français, vérifiables par `probe-pack` :
+elle confronte le dossier à ce que le thème, la barre et la table des types
+de fichiers référencent, et signale aussi bien les noms demandés sans
+fichier que les fichiers que rien ne lit.
 
 ### Deux limites constatées, non contournables
 
