@@ -3,5 +3,5 @@
     <style>.k-accent { fill: #C8102E; fill-opacity: 0.28; }</style>
     <path fill-rule="evenodd" d="M3,1 H10 L13,4 V15 H3 Z M4,2 V14 H12 V5 H9 V2 Z" />
     <rect x="5" y="6" width="2" height="2" />
-    <polygon points="4,13 8,8 12,13" />
+    <polygon points="5,13 8,9 11,13" />
 </svg>

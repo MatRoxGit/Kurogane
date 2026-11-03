@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" shape-rendering="crispEdges" color="#C8102E" fill="none" stroke="#C8102E" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter">
+    <style>.k-accent { fill: #C8102E; fill-opacity: 0.28; }</style>
+    <rect class="k-accent" x="3" y="5" width="12" height="10" />
+    <path d="M9 15v4M5 19h8" />
+    <rect x="19" y="5" width="2" height="14" />
+</svg>

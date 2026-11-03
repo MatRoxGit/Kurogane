@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" shape-rendering="crispEdges" color="#C8102E" fill="#C8102E" stroke="none">
+    <style>.k-accent { fill: #C8102E; fill-opacity: 0.28; }</style>
+    <rect x="6" y="1" width="4" height="1" />
+    <rect x="2" y="3" width="12" height="1" />
+    <path fill-rule="evenodd" d="M3,4 H13 V15 H3 Z M4,5 V14 H12 V5 Z" />
+    <rect class="k-accent" x="4" y="5" width="8" height="9" />
+    <rect x="5" y="6" width="6" height="2" />
+    <rect x="6" y="9" width="4" height="3" />
+</svg>
