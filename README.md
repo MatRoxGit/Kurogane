@@ -197,13 +197,12 @@ l'élévation ne la garantissant pas.
 
 La section `icons` accepte quinze entrées ; l'exemple n'en montre que six.
 
-Cinq sections supplémentaires, facultatives, n'interviennent pas dans
+Quatre sections supplémentaires, facultatives, n'interviennent pas dans
 `apply` : elles décrivent des effets posés à chaud ou l'apparence de
 fenêtres que Kurogane dessine lui-même.
 
 | Section        | Lue par                     | Contenu |
 | -------------- | --------------------------- | ------- |
-| `taskbarStyle` | `taskbar-style`, `resident` | marges, rayon, teinte et opacité de la barre Windows |
 | `barre`        | `barre`                     | nœud, état, suffixe de date et épingles de la barre Kurogane |
 | `fenetres`     | `barre`, `probe-chrome`     | `coinsCarres`, `barreTitre`, `texteTitre`, `bordure` |
 | `contraste`    | `contraste`                 | la palette du thème de contraste, décrite en rôles |
@@ -393,30 +392,20 @@ autant que dans le `finally` : une exception, un Ctrl+C ou un arrêt brutal
 rendent la barre de Windows. Laisser un utilisateur sans barre des tâches
 serait la pire sortie possible pour un projet qui promet la réversibilité.
 
-### La voie précédente — restylage de la barre de Windows
+### La voie essayée avant
 
 Avant le remplacement, Kurogane restylait la **fenêtre vivante** de la barre
-Windows : `SetWindowRgn` sur `Shell_TrayWnd` pour la découper,
-`SetWindowCompositionAttribute` pour y poser une teinte.
+de Windows — découpage par `SetWindowRgn`, teinte par
+`SetWindowCompositionAttribute`. Cette voie ne menait pas au thème visé : la
+barre de Windows 11 est dessinée en XAML, et le restylage n'en touche que
+l'enveloppe. Le code a été retiré.
 
-```
-kurogane taskbar-style --marge 12 --rayon 10 --teinte "#C8102E"
-kurogane taskbar-style --reinitialiser
-kurogane resident --theme themes\kurogane-obsidian.json
-```
-
-Les commandes existent toujours, mais **cette voie ne mène pas au thème
-visé** : la barre de Windows 11 est dessinée en XAML, et le restylage ne
-touche que son enveloppe. C'est ce constat qui a conduit au remplacement
-décrit ci-dessus.
-
-Deux mesures en sont restées, valables pour toute manipulation de fenêtre
+Deux constats en sont restés, valables pour toute manipulation de fenêtre
 système :
 
 - **Le processus doit être sensible au DPI.** Sans ça, Windows virtualise
-  les coordonnées : sur un écran à 125 %, la région est posée de travers et
-  la zone de notification disparaît.
-- **La teinte n'a jamais pris.** Le pont XAML peint par-dessus.
+  les coordonnées : sur un écran à 125 %, une région est posée de travers.
+- **Une teinte posée sur une fenêtre XAML ne tient pas.** Le pont la repeint.
   `SetWindowCompositionAttribute` n'est d'ailleurs pas documenté par
   Microsoft : un échec y est une réponse possible, pas une anomalie.
 

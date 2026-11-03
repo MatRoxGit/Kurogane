@@ -16,7 +16,6 @@ public sealed class ThemeDefinition
     public IconsSection?    Icons     { get; set; }
     public TaskbarSection?  Taskbar   { get; set; }
     public StartMenuSection? StartMenu { get; set; }
-    public TaskbarStyleSection? TaskbarStyle { get; set; }
     public BarreSection?    Barre     { get; set; }
     public FenetresSection? Fenetres  { get; set; }
     public ContrasteSection? Contraste { get; set; }
@@ -224,27 +223,6 @@ public sealed class ExplorateurSection
     /// existent ; le défaut suit celui de Windows.
     /// </summary>
     public bool? OuvertureSimpleClic { get; set; }
-}
-
-public sealed class TaskbarStyleSection
-{
-    /// <summary>Marge latérale en pixels. Au-delà d'une douzaine, le contenu est rogné.</summary>
-    public int? Marge { get; set; }
-
-    /// <summary>Marge haute et basse en pixels.</summary>
-    public int? MargeBasse { get; set; }
-
-    /// <summary>Rayon des coins en pixels.</summary>
-    public int? Rayon { get; set; }
-
-    /// <summary>Couleur de teinte, au format #RRGGBB. Absente : aucune teinte.</summary>
-    public string? Teinte { get; set; }
-
-    /// <summary>Opacité de la teinte, de 0 à 255.</summary>
-    public int? Opacite { get; set; }
-
-    /// <summary>Flou acrylique plutôt qu'un dégradé net.</summary>
-    public bool? Acrylique { get; set; }
 }
 
 public sealed class StartMenuSection

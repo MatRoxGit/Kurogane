@@ -1,6 +1,6 @@
 ﻿{
   "name": "Kurogane Obsidian",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "author": "Mathieu",
   "darkMode": {
     "apps": true,
@@ -32,14 +32,6 @@
     "recentFiles": false,
     "recentApps": false,
     "accountNotifications": false
-  },
-  "taskbarStyle": {
-    "marge": 12,
-    "margeBasse": 6,
-    "rayon": 10,
-    "teinte": "#C8102E",
-    "opacite": 180,
-    "acrylique": true
   },
   "barre": {
     "noeud": "SYS.NODE // 01",
