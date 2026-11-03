@@ -8,7 +8,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.26.0";
+    private const string Version = "0.27.0";
 
     private static readonly IThemeModule[] Modules =
     {
@@ -49,6 +49,7 @@ internal static class Program
                 "taskbar-style" => CmdTaskbarStyle(args),
                 "resident" => CmdResident(args),
                 "barre" => CmdBarre(args),
+                "explorateur" => CmdExplorateur(args),
                 "probe-chrome" => CmdProbeChrome(args),
                 "probe-contraste" => CmdProbeContraste(args),
                 "contraste" => CmdContraste(args),
@@ -587,6 +588,22 @@ internal static class Program
     }
 
     /// <summary>
+    /// Ouvre l'explorateur Kurogane. Le thème est facultatif : sans lui, la
+    /// fenêtre s'ouvre sans icônes plutôt que de refuser de démarrer.
+    /// </summary>
+    private static int CmdExplorateur(string[] args)
+    {
+        using var journal = new Journal("explorateur");
+
+        ThemeDefinition? theme = null;
+
+        if (Flag(args, "--theme") is { } chemin)
+            theme = ThemeDefinition.Load(chemin);
+
+        return Kurogane.Explorateur.ExplorateurApp.Executer(journal, theme);
+    }
+
+    /// <summary>
     /// Réglage de restylage, lu dans le thème puis surchargé par les options
     /// de la ligne de commande. Partagé par taskbar-style et resident, pour
     /// que les deux se comportent exactement pareil.
@@ -1040,6 +1057,12 @@ internal static class Program
                   rend tout. Sert à distinguer un attribut refusé par
                   Windows d'un attribut accepté mais ignoré par
                   l'application. Rien n'est écrit.
+
+              explorateur [--theme <fichier.json>]
+                  Ouvre l'explorateur Kurogane. Étape 1 : la coquille — le
+                  contenu est figé, rien ne navigue et rien n'est lu sur le
+                  disque, hormis les icônes du thème.
+                  Rien n'est écrit : c'est une fenêtre, pas un réglage.
 
               barre --theme <fichier.json>
                   Remplace la barre des tâches de Windows par celle de

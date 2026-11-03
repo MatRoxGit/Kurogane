@@ -1,0 +1,421 @@
+<!--
+  KUROGANE // explorateur — coquille
+
+  Étape 1 : l'apparence seule, contenu figé. Rien ne navigue, rien ne lit le
+  disque. On valide la fenêtre avant d'investir dans le comportement, comme
+  on l'a fait pour la barre.
+
+  WindowChrome plutôt qu'AllowsTransparency : on garde le redimensionnement
+  natif et l'accélération matérielle, et on ne paie pas le rendu logiciel
+  qu'impose une fenêtre transparente.
+-->
+<Window x:Class="Kurogane.Explorateur.FenetreExplorateur"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:b="clr-namespace:Kurogane.Barre"
+        Title="KRG//EXPLORER" Width="1040" Height="660"
+        MinWidth="720" MinHeight="420"
+        WindowStyle="None" ResizeMode="CanResize"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        Background="{DynamicResource Obsidienne}">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="42" ResizeBorderThickness="6"
+                      CornerRadius="0" GlassFrameThickness="0"
+                      UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Theme/Palette.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Bouton de fenêtre : plat, sans cadre. La fermeture vire au
+                 rouge au survol, les deux autres à la soudure. -->
+            <Style x:Key="BoutonFenetre" TargetType="Button">
+                <Setter Property="Width" Value="42" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Foreground" Value="{DynamicResource TexteEteint}" />
+                <Setter Property="FontFamily" Value="{DynamicResource Mono}" />
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Fond" Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Fond" Property="Background"
+                                            Value="{DynamicResource Soudure}" />
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TexteVif}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="BoutonFermer" TargetType="Button" BasedOn="{StaticResource BoutonFenetre}">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Fond" Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Fond" Property="Background"
+                                            Value="{DynamicResource Rouge}" />
+                                    <Setter Property="Foreground" Value="White" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Bouton de navigation : carré, cadre discret. -->
+            <Style x:Key="BoutonNav" TargetType="Button">
+                <Setter Property="Width" Value="34" />
+                <Setter Property="Height" Value="28" />
+                <Setter Property="Margin" Value="0,0,6,0" />
+                <Setter Property="Foreground" Value="{DynamicResource TexteVif}" />
+                <Setter Property="FontFamily" Value="{DynamicResource Mono}" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Fond" Background="{DynamicResource Surface}"
+                                    BorderBrush="{DynamicResource Soudure}"
+                                    BorderThickness="1">
+                                <ContentPresenter HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Fond" Property="BorderBrush"
+                                            Value="{DynamicResource Rouge}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Nœud du volet gauche. Le liseré rouge marque la sélection. -->
+            <Style x:Key="Noeud" TargetType="ContentControl">
+                <Setter Property="Height" Value="38" />
+                <Setter Property="Margin" Value="8,1" />
+                <Setter Property="Foreground" Value="{DynamicResource TexteEteint}" />
+                <Setter Property="FontFamily" Value="{DynamicResource Mono}" />
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ContentControl">
+                            <Border x:Name="Fond" Background="Transparent"
+                                    Padding="10,0">
+                                <ContentPresenter VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Fond" Property="Background"
+                                            Value="{DynamicResource Surface}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="NoeudActif" TargetType="ContentControl" BasedOn="{StaticResource Noeud}">
+                <Setter Property="Foreground" Value="{DynamicResource TexteVif}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ContentControl">
+                            <Border Background="{DynamicResource Surface}"
+                                    BorderBrush="{DynamicResource Rouge}"
+                                    BorderThickness="2,0,0,0" Padding="10,0">
+                                <ContentPresenter VerticalAlignment="Center" />
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="Separateur" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource Rouge}" />
+                <Setter Property="FontFamily" Value="{DynamicResource Mono}" />
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="Margin" Value="6,0" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="Text" Value="//" />
+            </Style>
+
+            <Style x:Key="Segment" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource TexteVif}" />
+                <Setter Property="FontFamily" Value="{DynamicResource Mono}" />
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+
+            <Style x:Key="Etiquette" TargetType="TextBlock" BasedOn="{StaticResource Segment}">
+                <Setter Property="Foreground" Value="{DynamicResource TexteEteint}" />
+                <Setter Property="FontSize" Value="10" />
+            </Style>
+
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Border BorderBrush="{DynamicResource Rouge}" BorderThickness="1.5">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="4" />
+                <RowDefinition Height="38" />
+                <RowDefinition Height="44" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="28" />
+            </Grid.RowDefinitions>
+
+            <!-- ===== Rail ===== -->
+            <Grid Grid.Row="0" Background="{DynamicResource Rail}">
+                <Rectangle x:Name="Encoche" Fill="{DynamicResource Rouge}"
+                           HorizontalAlignment="Left" Width="300" />
+            </Grid>
+
+            <!-- ===== Barre de titre ===== -->
+            <Grid Grid.Row="1" Background="{DynamicResource Surface}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <b:Biseau Grid.Column="0" Coupe="5" Width="26" Height="24"
+                          Margin="10,0,0,0" VerticalAlignment="Center"
+                          Background="{DynamicResource Creux}"
+                          BorderBrush="{DynamicResource Rouge}" BorderThickness="1">
+                    <TextBlock Text="▣" Foreground="{DynamicResource Rouge}"
+                               FontSize="12" HorizontalAlignment="Center"
+                               VerticalAlignment="Center" />
+                </b:Biseau>
+
+                <TextBlock Grid.Column="1" Text="KRG//EXPLORER" Margin="10,0,0,0"
+                           Foreground="{DynamicResource TexteVif}"
+                           FontFamily="{DynamicResource Mono}" FontSize="12"
+                           FontWeight="Bold" VerticalAlignment="Center" />
+
+                <Border Grid.Column="2" Margin="14,0,0,0" Padding="8,3"
+                        VerticalAlignment="Center"
+                        Background="{DynamicResource Creux}"
+                        BorderBrush="{DynamicResource RougeEteint}" BorderThickness="1">
+                    <TextBlock Text="PID:0482 // RING-0 // ELEVATED"
+                               Foreground="{DynamicResource Rouge}"
+                               FontFamily="{DynamicResource Mono}" FontSize="9.5"
+                               VerticalAlignment="Center" />
+                </Border>
+
+                <StackPanel Grid.Column="3" Orientation="Horizontal"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Rectangle Width="30" Height="1" Fill="{DynamicResource Soudure}" Margin="3,0" />
+                    <Rectangle Width="6"  Height="1" Fill="{DynamicResource RougeEteint}" Margin="3,0" />
+                    <Rectangle Width="6"  Height="1" Fill="{DynamicResource RougeEteint}" Margin="3,0" />
+                    <Rectangle Width="30" Height="1" Fill="{DynamicResource Soudure}" Margin="3,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="4" Orientation="Horizontal">
+                    <Button x:Name="BtnReduire"  Style="{StaticResource BoutonFenetre}" Content="—" />
+                    <Button x:Name="BtnAgrandir" Style="{StaticResource BoutonFenetre}" Content="▢" />
+                    <Button x:Name="BtnFermer"   Style="{StaticResource BoutonFermer}"  Content="✕" />
+                </StackPanel>
+            </Grid>
+
+            <!-- ===== Barre d'outils ===== -->
+            <Grid Grid.Row="2" Background="{DynamicResource Obsidienne}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="260" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal"
+                            Margin="12,0,6,0" VerticalAlignment="Center">
+                    <Button Style="{StaticResource BoutonNav}" Content="‹" />
+                    <Button Style="{StaticResource BoutonNav}" Content="›" />
+                    <Button Style="{StaticResource BoutonNav}" Content="↑" />
+                </StackPanel>
+
+                <Border Grid.Column="1" Height="28" VerticalAlignment="Center"
+                        Background="{DynamicResource Creux}"
+                        BorderBrush="{DynamicResource Soudure}" BorderThickness="1"
+                        Padding="10,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource Etiquette}" Text="ROOT" />
+                        <TextBlock Style="{StaticResource Separateur}" />
+                        <TextBlock Style="{StaticResource Segment}" Text="VOL_C:" />
+                        <TextBlock Style="{StaticResource Separateur}" />
+                        <TextBlock Style="{StaticResource Segment}" Text="ASSETS" />
+                        <TextBlock Style="{StaticResource Separateur}" />
+                        <TextBlock Style="{StaticResource Segment}" Text="ICONS_KUROGANE"
+                                   Foreground="{DynamicResource Rouge}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Height="28" Margin="10,0,12,0"
+                        VerticalAlignment="Center"
+                        Background="{DynamicResource Creux}"
+                        BorderBrush="{DynamicResource Soudure}" BorderThickness="1"
+                        Padding="10,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="⌕" Foreground="{DynamicResource TexteEteint}"
+                                   FontSize="12" Margin="0,0,8,0"
+                                   VerticalAlignment="Center" />
+                        <TextBlock Style="{StaticResource Etiquette}" Text="FILTRER" />
+                        <TextBlock Style="{StaticResource Separateur}" />
+                        <TextBlock Style="{StaticResource Segment}" Text="*.ICO_" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ===== Corps ===== -->
+            <Grid Grid.Row="3">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="248" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Volet des nœuds -->
+                <Border Grid.Column="0" Background="{DynamicResource Obsidienne}"
+                        BorderBrush="{DynamicResource Soudure}" BorderThickness="0,0,1,0">
+                    <StackPanel>
+                        <TextBlock Margin="18,16,0,10" Style="{StaticResource Etiquette}">
+                            <Run Text="NOEUDS SYSTÈME" />
+                            <Run Text=" // " Foreground="{DynamicResource Rouge}" />
+                            <Run Text="MONTÉS" />
+                        </TextBlock>
+
+                        <ContentControl Style="{StaticResource NoeudActif}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="▰" Foreground="{DynamicResource Rouge}"
+                                           FontSize="12" Margin="0,0,10,0"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Text="PACK" VerticalAlignment="Center"
+                                           FontFamily="{DynamicResource Mono}" FontSize="11"
+                                           FontWeight="Bold" />
+                                <TextBlock Style="{StaticResource Separateur}" />
+                                <TextBlock Text="KUROGANE" VerticalAlignment="Center"
+                                           FontFamily="{DynamicResource Mono}" FontSize="11" />
+                            </StackPanel>
+                        </ContentControl>
+
+                        <ContentControl Style="{StaticResource Noeud}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="▱" FontSize="12" Margin="0,0,10,0"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Text="POSTE" VerticalAlignment="Center"
+                                           FontFamily="{DynamicResource Mono}" FontSize="11" />
+                                <TextBlock Style="{StaticResource Separateur}"
+                                           Foreground="{DynamicResource RougeEteint}" />
+                                <TextBlock Text="CE PC" VerticalAlignment="Center"
+                                           FontFamily="{DynamicResource Mono}" FontSize="11" />
+                            </StackPanel>
+                        </ContentControl>
+
+                        <ContentControl Style="{StaticResource Noeud}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="▱" FontSize="12" Margin="0,0,10,0"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Text="SHELL" VerticalAlignment="Center"
+                                           FontFamily="{DynamicResource Mono}" FontSize="11" />
+                                <TextBlock Style="{StaticResource Separateur}"
+                                           Foreground="{DynamicResource RougeEteint}" />
+                                <TextBlock Text="SCRIPTS" VerticalAlignment="Center"
+                                           FontFamily="{DynamicResource Mono}" FontSize="11" />
+                            </StackPanel>
+                        </ContentControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- Contenu -->
+                <Grid Grid.Column="1" Background="{DynamicResource Obsidienne}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Margin="14,16,14,10" Height="30"
+                            Background="{DynamicResource Creux}"
+                            BorderBrush="{DynamicResource Soudure}" BorderThickness="1"
+                            Padding="12,0">
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Etiquette}" Text="IDENTIFIANT" />
+                                <TextBlock Style="{StaticResource Separateur}" />
+                                <TextBlock Style="{StaticResource Etiquette}"
+                                           Text="RESSOURCE SYSTÈME" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                                        VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource Etiquette}" Text="FORMAT"
+                                           Margin="0,0,28,0" />
+                                <TextBlock Style="{StaticResource Etiquette}" Text="STATUT"
+                                           Foreground="{DynamicResource Rouge}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled" Padding="14,0,14,14">
+                        <ItemsControl x:Name="Cartes">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+
+            <!-- ===== Barre d'état ===== -->
+            <Grid Grid.Row="4" Background="{DynamicResource Surface}">
+                <StackPanel Orientation="Horizontal" Margin="14,0"
+                            VerticalAlignment="Center">
+                    <Ellipse Width="6" Height="6" Fill="{DynamicResource Rouge}"
+                             Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <TextBlock x:Name="Compte" Style="{StaticResource Etiquette}"
+                               Foreground="{DynamicResource TexteVif}" Text="0 OBJETS CHARGÉS" />
+                    <TextBlock Style="{StaticResource Separateur}" FontSize="10" />
+                    <TextBlock Style="{StaticResource Etiquette}" Text="0 ERREUR" />
+                    <Rectangle Width="1" Height="12" Fill="{DynamicResource Soudure}"
+                               Margin="14,0" />
+                    <TextBlock Style="{StaticResource Etiquette}"
+                               Text="CANAL ALPHA : 32-BIT RGBA" />
+                    <Rectangle Width="1" Height="12" Fill="{DynamicResource Soudure}"
+                               Margin="14,0" />
+                    <TextBlock Style="{StaticResource Etiquette}"
+                               Text="GRILLE : 16/24/256PX" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="14,0"
+                            HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock Style="{StaticResource Etiquette}" Text="DWM" />
+                    <TextBlock Style="{StaticResource Separateur}" FontSize="10" />
+                    <TextBlock Style="{StaticResource Etiquette}" Text="SYNC"
+                               Foreground="{DynamicResource Ambre}" />
+                    <TextBlock Text="↗" Foreground="{DynamicResource Ambre}"
+                               FontSize="11" Margin="6,0,0,0" VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

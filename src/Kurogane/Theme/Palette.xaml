@@ -1,0 +1,38 @@
+<!--
+  KUROGANE // palette partagée
+
+  Source unique des couleurs de l'interface. La barre et l'explorateur la
+  fusionnent tous les deux : recopier ces valeurs dans chaque fenêtre les
+  ferait diverger, comme avait commencé à le faire le fichier .theme avant
+  qu'on le génère.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <SolidColorBrush x:Key="Obsidienne"  Color="#FF080506" />
+    <SolidColorBrush x:Key="Surface"     Color="#FF120A0C" />
+    <SolidColorBrush x:Key="Creux"       Color="#FF0C0608" />
+    <SolidColorBrush x:Key="Soudure"     Color="#FF241216" />
+    <SolidColorBrush x:Key="Rail"        Color="#FF160B0E" />
+    <SolidColorBrush x:Key="Rouge"       Color="#FFC8102E" />
+    <SolidColorBrush x:Key="RougeVoile"  Color="#38C8102E" />
+    <SolidColorBrush x:Key="RougeEteint" Color="#FF3A1016" />
+    <SolidColorBrush x:Key="Ambre"       Color="#FFFF9E00" />
+    <SolidColorBrush x:Key="TexteVif"    Color="#FFF4F0F1" />
+    <SolidColorBrush x:Key="TexteEteint" Color="#FF8C6268" />
+
+    <FontFamily x:Key="Mono">JetBrains Mono, Consolas, Courier New</FontFamily>
+
+    <!-- Lignes de balayage : la trame qui donne le grain cathodique. -->
+    <DrawingBrush x:Key="Balayage" TileMode="Tile" Viewport="0,0,3,3"
+                  ViewportUnits="Absolute" Opacity="0.18">
+        <DrawingBrush.Drawing>
+            <GeometryDrawing Brush="#FF000000">
+                <GeometryDrawing.Geometry>
+                    <RectangleGeometry Rect="0,0,3,1" />
+                </GeometryDrawing.Geometry>
+            </GeometryDrawing>
+        </DrawingBrush.Drawing>
+    </DrawingBrush>
+
+</ResourceDictionary>
