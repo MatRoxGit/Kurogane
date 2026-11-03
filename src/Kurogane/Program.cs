@@ -8,7 +8,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.27.0";
+    private const string Version = "0.29.0";
 
     private static readonly IThemeModule[] Modules =
     {
@@ -588,6 +588,24 @@ internal static class Program
     }
 
     /// <summary>
+    /// Premier argument qui n'est ni une option, ni la valeur d'une option.
+    /// </summary>
+    private static string? Positionnel(string[] args)
+    {
+        for (int i = 1; i < args.Length; i++)
+        {
+            if (args[i].StartsWith('-')) continue;
+
+            // Précédé d'une option : c'est sa valeur, pas un argument libre.
+            if (i > 1 && args[i - 1].StartsWith('-')) continue;
+
+            return args[i];
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Ouvre l'explorateur Kurogane. Le thème est facultatif : sans lui, la
     /// fenêtre s'ouvre sans icônes plutôt que de refuser de démarrer.
     /// </summary>
@@ -600,7 +618,15 @@ internal static class Program
         if (Flag(args, "--theme") is { } chemin)
             theme = ThemeDefinition.Load(chemin);
 
-        return Kurogane.Explorateur.ExplorateurApp.Executer(journal, theme);
+        // Le premier argument libre sert de dossier de départ : c'est la
+        // forme qu'aura l'appel du shell quand l'explorateur deviendra le
+        // gestionnaire par défaut.
+        //
+        // « Libre » veut dire qui ne suit pas une option : sans cette
+        // précaution, la valeur de --theme serait prise pour un dossier.
+        string? depart = Flag(args, "--chemin") ?? Positionnel(args);
+
+        return Kurogane.Explorateur.ExplorateurApp.Executer(journal, theme, depart);
     }
 
     /// <summary>
@@ -1058,11 +1084,13 @@ internal static class Program
                   Windows d'un attribut accepté mais ignoré par
                   l'application. Rien n'est écrit.
 
-              explorateur [--theme <fichier.json>]
-                  Ouvre l'explorateur Kurogane. Étape 1 : la coquille — le
-                  contenu est figé, rien ne navigue et rien n'est lu sur le
-                  disque, hormis les icônes du thème.
-                  Rien n'est écrit : c'est une fenêtre, pas un réglage.
+              explorateur [<dossier>] [--theme <fichier.json>]
+                  Ouvre l'explorateur Kurogane sur un dossier. Navigation en
+                  lecture seule : listage, précédent, suivant, parent,
+                  double-clic pour entrer dans un dossier ou ouvrir un
+                  fichier avec son application.
+                  Rien n'est créé, renommé ni supprimé. La barre d'état
+                  affiche les temps de lecture et de rendu.
 
               barre --theme <fichier.json>
                   Remplace la barre des tâches de Windows par celle de

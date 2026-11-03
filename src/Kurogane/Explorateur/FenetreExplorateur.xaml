@@ -13,6 +13,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:b="clr-namespace:Kurogane.Barre"
+        xmlns:k="clr-namespace:Kurogane.Explorateur"
         Title="KRG//EXPLORER" Width="1040" Height="660"
         MinWidth="720" MinHeight="420"
         WindowStyle="None" ResizeMode="CanResize"
@@ -171,6 +172,47 @@
                 <Setter Property="FontSize" Value="10" />
             </Style>
 
+            <!-- Gabarit d'une carte. En XAML et non en C# : c'est ce qui
+                 permet au panneau de ne créer le contrôle qu'au moment où
+                 la carte entre à l'écran. -->
+            <DataTemplate x:Key="ModeleCarte" DataType="{x:Type k:CarteVue}">
+                <b:Biseau Coupe="8" Width="236" Height="62" Margin="0,0,10,10"
+                          Padding="12,0" Cursor="Hand"
+                          Background="{DynamicResource Surface}"
+                          BorderBrush="{DynamicResource Soudure}"
+                          BorderThickness="1"
+                          ToolTip="{Binding Chemin}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border Width="34" Height="34" Margin="0,0,12,0"
+                                VerticalAlignment="Center"
+                                Background="{DynamicResource Creux}"
+                                BorderBrush="{DynamicResource RougeEteint}"
+                                BorderThickness="1">
+                            <Image Source="{Binding Icone}" Width="24" Height="24"
+                                   Stretch="Uniform"
+                                   RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Nom}" MaxWidth="150"
+                                       Foreground="{DynamicResource TexteVif}"
+                                       FontFamily="{DynamicResource Mono}"
+                                       FontSize="11" FontWeight="Bold"
+                                       TextTrimming="CharacterEllipsis" />
+                            <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                <TextBlock Text="{Binding Meta}"
+                                           Foreground="{DynamicResource TexteEteint}"
+                                           FontFamily="{DynamicResource Mono}" FontSize="9.5" />
+                                <TextBlock Text=" // " Foreground="{DynamicResource Rouge}"
+                                           FontFamily="{DynamicResource Mono}" FontSize="9.5" />
+                                <TextBlock Text="{Binding Date}"
+                                           Foreground="{DynamicResource TexteEteint}"
+                                           FontFamily="{DynamicResource Mono}" FontSize="9.5" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </b:Biseau>
+            </DataTemplate>
+
         </ResourceDictionary>
     </Window.Resources>
 
@@ -218,7 +260,7 @@
                         VerticalAlignment="Center"
                         Background="{DynamicResource Creux}"
                         BorderBrush="{DynamicResource RougeEteint}" BorderThickness="1">
-                    <TextBlock Text="PID:0482 // RING-0 // ELEVATED"
+                    <TextBlock x:Name="Puce" Text="PID:0000 // RING-3"
                                Foreground="{DynamicResource Rouge}"
                                FontFamily="{DynamicResource Mono}" FontSize="9.5"
                                VerticalAlignment="Center" />
@@ -249,25 +291,17 @@
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal"
                             Margin="12,0,6,0" VerticalAlignment="Center">
-                    <Button Style="{StaticResource BoutonNav}" Content="‹" />
-                    <Button Style="{StaticResource BoutonNav}" Content="›" />
-                    <Button Style="{StaticResource BoutonNav}" Content="↑" />
+                    <Button x:Name="BtnPrecedent" Style="{StaticResource BoutonNav}" Content="‹" />
+                    <Button x:Name="BtnSuivant"   Style="{StaticResource BoutonNav}" Content="›" />
+                    <Button x:Name="BtnParent"    Style="{StaticResource BoutonNav}" Content="↑" />
                 </StackPanel>
 
                 <Border Grid.Column="1" Height="28" VerticalAlignment="Center"
                         Background="{DynamicResource Creux}"
                         BorderBrush="{DynamicResource Soudure}" BorderThickness="1"
                         Padding="10,0">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Style="{StaticResource Etiquette}" Text="ROOT" />
-                        <TextBlock Style="{StaticResource Separateur}" />
-                        <TextBlock Style="{StaticResource Segment}" Text="VOL_C:" />
-                        <TextBlock Style="{StaticResource Separateur}" />
-                        <TextBlock Style="{StaticResource Segment}" Text="ASSETS" />
-                        <TextBlock Style="{StaticResource Separateur}" />
-                        <TextBlock Style="{StaticResource Segment}" Text="ICONS_KUROGANE"
-                                   Foreground="{DynamicResource Rouge}" />
-                    </StackPanel>
+                    <StackPanel x:Name="FilDAriane" Orientation="Horizontal"
+                                VerticalAlignment="Center" />
                 </Border>
 
                 <Border Grid.Column="2" Height="28" Margin="10,0,12,0"
@@ -303,45 +337,7 @@
                             <Run Text="MONTÉS" />
                         </TextBlock>
 
-                        <ContentControl Style="{StaticResource NoeudActif}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="▰" Foreground="{DynamicResource Rouge}"
-                                           FontSize="12" Margin="0,0,10,0"
-                                           VerticalAlignment="Center" />
-                                <TextBlock Text="PACK" VerticalAlignment="Center"
-                                           FontFamily="{DynamicResource Mono}" FontSize="11"
-                                           FontWeight="Bold" />
-                                <TextBlock Style="{StaticResource Separateur}" />
-                                <TextBlock Text="KUROGANE" VerticalAlignment="Center"
-                                           FontFamily="{DynamicResource Mono}" FontSize="11" />
-                            </StackPanel>
-                        </ContentControl>
-
-                        <ContentControl Style="{StaticResource Noeud}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="▱" FontSize="12" Margin="0,0,10,0"
-                                           VerticalAlignment="Center" />
-                                <TextBlock Text="POSTE" VerticalAlignment="Center"
-                                           FontFamily="{DynamicResource Mono}" FontSize="11" />
-                                <TextBlock Style="{StaticResource Separateur}"
-                                           Foreground="{DynamicResource RougeEteint}" />
-                                <TextBlock Text="CE PC" VerticalAlignment="Center"
-                                           FontFamily="{DynamicResource Mono}" FontSize="11" />
-                            </StackPanel>
-                        </ContentControl>
-
-                        <ContentControl Style="{StaticResource Noeud}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="▱" FontSize="12" Margin="0,0,10,0"
-                                           VerticalAlignment="Center" />
-                                <TextBlock Text="SHELL" VerticalAlignment="Center"
-                                           FontFamily="{DynamicResource Mono}" FontSize="11" />
-                                <TextBlock Style="{StaticResource Separateur}"
-                                           Foreground="{DynamicResource RougeEteint}" />
-                                <TextBlock Text="SCRIPTS" VerticalAlignment="Center"
-                                           FontFamily="{DynamicResource Mono}" FontSize="11" />
-                            </StackPanel>
-                        </ContentControl>
+                        <StackPanel x:Name="Noeuds" />
                     </StackPanel>
                 </Border>
 
@@ -373,16 +369,26 @@
                         </Grid>
                     </Border>
 
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled" Padding="14,0,14,14">
-                        <ItemsControl x:Name="Cartes">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel Orientation="Horizontal" />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                        </ItemsControl>
-                    </ScrollViewer>
+                    <ItemsControl x:Name="Cartes" Grid.Row="1"
+                                  ItemTemplate="{StaticResource ModeleCarte}"
+                                  VirtualizingPanel.IsVirtualizing="True"
+                                  ScrollViewer.CanContentScroll="True">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <k:PanneauCartes LargeurCarte="246" HauteurCarte="72" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.Template>
+                            <ControlTemplate TargetType="ItemsControl">
+                                <ScrollViewer CanContentScroll="True"
+                                              VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled"
+                                              Padding="14,0,14,14">
+                                    <ItemsPresenter />
+                                </ScrollViewer>
+                            </ControlTemplate>
+                        </ItemsControl.Template>
+                    </ItemsControl>
                 </Grid>
             </Grid>
 
@@ -395,15 +401,15 @@
                     <TextBlock x:Name="Compte" Style="{StaticResource Etiquette}"
                                Foreground="{DynamicResource TexteVif}" Text="0 OBJETS CHARGÉS" />
                     <TextBlock Style="{StaticResource Separateur}" FontSize="10" />
-                    <TextBlock Style="{StaticResource Etiquette}" Text="0 ERREUR" />
+                    <TextBlock x:Name="Erreurs" Style="{StaticResource Etiquette}" Text="0 ERREUR" />
                     <Rectangle Width="1" Height="12" Fill="{DynamicResource Soudure}"
                                Margin="14,0" />
                     <TextBlock Style="{StaticResource Etiquette}"
                                Text="CANAL ALPHA : 32-BIT RGBA" />
                     <Rectangle Width="1" Height="12" Fill="{DynamicResource Soudure}"
                                Margin="14,0" />
-                    <TextBlock Style="{StaticResource Etiquette}"
-                               Text="GRILLE : 16/24/256PX" />
+                    <TextBlock x:Name="Chrono" Style="{StaticResource Etiquette}"
+                               Text="—" />
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" Margin="14,0"
