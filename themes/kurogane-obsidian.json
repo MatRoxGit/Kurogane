@@ -1,6 +1,6 @@
 ﻿{
   "name": "Kurogane Obsidian",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "author": "Mathieu",
   "darkMode": {
     "apps": true,
@@ -64,7 +64,7 @@
       {
         "libelle": "PARAMETRES",
         "commande": "ms-settings:",
-        "icone": "panneau-configuration.ico"
+        "icone": "parametres.ico"
       },
       {
         "libelle": "CE PC",
@@ -103,7 +103,7 @@
     "cePc": "ce-pc.ico",
     "reseau": "reseau.ico",
     "utilisateur": "utilisateur.ico",
-    "panneauConfiguration": "panneau-configuration.ico",
+    "panneauConfiguration": "parametres.ico",
     "corbeilleVide": "corbeille-vide.ico",
     "corbeillePleine": "corbeille-pleine.ico",
     "bureau": "bureau.ico",
@@ -114,6 +114,6 @@
     "videos": "videos.ico",
     "dossier": "dossier.ico",
     "lecteur": "lecteur.ico",
-    "raccourciFleche": "raccourci-fleche.ico"
+    "raccourciFleche": "fleche-raccourci.ico"
   }
 }

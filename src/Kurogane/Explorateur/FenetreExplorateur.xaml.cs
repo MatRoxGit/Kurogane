@@ -84,13 +84,35 @@ public partial class FenetreExplorateur : Window
     {
         var ligne = new StackPanel { Orientation = Orientation.Horizontal };
 
-        ligne.Children.Add(new TextBlock
+        var vignette = new Border
         {
-            Text = "▱",
-            FontSize = 12,
+            Width = 20,
+            Height = 20,
             Margin = new Thickness(0, 0, 10, 0),
             VerticalAlignment = VerticalAlignment.Center,
-        });
+        };
+
+        if (Icone(racine.Icone + ".ico") is { } dessin)
+        {
+            var image = new Image { Source = dessin, Stretch = Stretch.Uniform };
+            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+            vignette.Child = image;
+        }
+        else
+        {
+            // Icône pas encore dessinée : le carré d'origine, plutôt qu'un
+            // vide qui décalerait l'alignement de la ligne.
+            vignette.Child = new TextBlock
+            {
+                Text = "▱",
+                FontSize = 12,
+                Foreground = (Brush)FindResource("TexteEteint"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+        }
+
+        ligne.Children.Add(vignette);
 
         ligne.Children.Add(Mono(racine.Libelle, "TexteVif", 11));
         ligne.Children.Add(Mono(" // ", "RougeEteint", 11));
@@ -307,18 +329,20 @@ public partial class FenetreExplorateur : Window
     // --------------------------------------------------------------- icônes
 
     /// <summary>
-    /// Icône du pack Kurogane selon la nature de l'entrée. L'extraction de
-    /// l'icône réelle d'un fichier viendra à l'étape 3 : elle demande le
-    /// shell, et un appel par fichier sur un dossier chargé mérite d'être
-    /// mesuré avant d'être posé.
+    /// Icône du pack Kurogane selon l'extension. Le cache rend l'opération
+    /// quasi gratuite : une vingtaine d'icônes distinctes couvrent un dossier
+    /// entier, quel que soit le nombre de fichiers.
     /// </summary>
     private BitmapSource? ChargerIcone(Entree entree)
     {
-        string? fichier = entree.EstDossier
-            ? _theme?.Icons?.Dossier
-            : _theme?.Icons?.Documents;
+        if (_theme?.Icons is null) return null;
 
-        return fichier is null ? null : Icone(fichier);
+        // Repli sur l'icône générique si celle de la famille n'a pas encore
+        // été dessinée : une case vide ne dit rien à l'utilisateur. Le
+        // manque, lui, est signalé là où il doit l'être — par probe-pack,
+        // pas par un trou dans l'affichage.
+        return Icone(TypesFichiers.Pour(entree) + ".ico")
+            ?? Icone(TypesFichiers.Generique + ".ico");
     }
 
     private readonly Dictionary<string, BitmapSource?> _cache = new(StringComparer.OrdinalIgnoreCase);

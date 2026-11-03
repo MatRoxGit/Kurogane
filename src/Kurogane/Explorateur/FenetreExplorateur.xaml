@@ -330,15 +330,26 @@
                 <!-- Volet des nœuds -->
                 <Border Grid.Column="0" Background="{DynamicResource Obsidienne}"
                         BorderBrush="{DynamicResource Soudure}" BorderThickness="0,0,1,0">
-                    <StackPanel>
-                        <TextBlock Margin="18,16,0,10" Style="{StaticResource Etiquette}">
+                    <!-- Grid et non StackPanel : un ScrollViewer empilé
+                         reçoit une hauteur infinie et ne défile jamais. -->
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Margin="18,16,0,10"
+                                   Style="{StaticResource Etiquette}">
                             <Run Text="NOEUDS SYSTÈME" />
                             <Run Text=" // " Foreground="{DynamicResource Rouge}" />
                             <Run Text="MONTÉS" />
                         </TextBlock>
 
-                        <StackPanel x:Name="Noeuds" />
-                    </StackPanel>
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel x:Name="Noeuds" />
+                        </ScrollViewer>
+                    </Grid>
                 </Border>
 
                 <!-- Contenu -->

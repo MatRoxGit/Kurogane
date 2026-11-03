@@ -14,26 +14,52 @@ public sealed class SourceFichiers : ISourceNoeuds
     /// chemins réels, pas des éléments de l'espace de noms : « Ce PC » et
     /// « Réseau » viendront avec l'implémentation shell.
     /// </summary>
-    private static readonly Environment.SpecialFolder[] Dossiers =
+    private static readonly (string Sous, string Libelle, string Icone)[] Dossiers =
     {
-        Environment.SpecialFolder.UserProfile,
-        Environment.SpecialFolder.Desktop,
-        Environment.SpecialFolder.MyDocuments,
-        Environment.SpecialFolder.MyPictures,
-        Environment.SpecialFolder.MyMusic,
-        Environment.SpecialFolder.MyVideos,
+        ("",              "ACCUEIL",    "accueil"),
+        ("Desktop",       "BUREAU",     "bureau"),
+        ("Documents",     "DOCUMENTS",  "documents"),
+        ("Downloads",     "TELECHARG.", "telechargements"),
+        ("Pictures",      "IMAGES",     "images"),
+        ("Music",         "MUSIQUE",    "musique"),
+        ("Videos",        "VIDEOS",     "videos"),
+        ("Favorites",     "FAVORIS",    "favoris"),
+        ("Links",         "LIENS",      "liens"),
+        ("Searches",      "RECHERCHES", "recherches"),
+        ("Saved Games",   "PARTIES",    "parties-enregistrees"),
+        ("3D Objects",    "OBJETS 3D",  "objets-3d"),
+    };
+
+    /// <summary>
+    /// Icône selon le type de lecteur. Windows distingue ces natures et les
+    /// montre ; les confondre toutes sous un même disque perdrait une
+    /// information que l'utilisateur lit d'un coup d'œil.
+    /// </summary>
+    private static string IconeLecteur(DriveType type) => type switch
+    {
+        DriveType.Removable => "cle-usb",
+        DriveType.CDRom     => "lecteur-optique",
+        DriveType.Network   => "lecteur-reseau",
+        DriveType.Ram       => "image-disque",
+        _                   => "lecteur",
     };
 
     public IReadOnlyList<Racine> Racines()
     {
         var liste = new List<Racine>();
 
-        foreach (var d in Dossiers)
-        {
-            string chemin = Environment.GetFolderPath(d);
-            if (chemin.Length == 0 || !Directory.Exists(chemin)) continue;
+        string profil = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-            liste.Add(new Racine("DOSSIER", Path.GetFileName(chemin).ToUpperInvariant(), chemin));
+        foreach (var (sous, libelle, icone) in Dossiers)
+        {
+            // Les dossiers du profil portent un nom anglais sur le disque,
+            // même sur un Windows français : c'est l'affichage qui est
+            // traduit, par desktop.ini, pas le dossier lui-même.
+            string chemin = sous.Length == 0 ? profil : Path.Combine(profil, sous);
+
+            if (!Directory.Exists(chemin)) continue;
+
+            liste.Add(new Racine("DOSSIER", libelle, chemin, icone));
         }
 
         foreach (var disque in DriveInfo.GetDrives())
@@ -44,7 +70,8 @@ public sealed class SourceFichiers : ISourceNoeuds
 
             string lettre = disque.Name.TrimEnd('\\', '/');
 
-            liste.Add(new Racine("VOL", lettre.ToUpperInvariant(), disque.RootDirectory.FullName));
+            liste.Add(new Racine("VOL", lettre.ToUpperInvariant(),
+                disque.RootDirectory.FullName, IconeLecteur(disque.DriveType)));
         }
 
         return liste;

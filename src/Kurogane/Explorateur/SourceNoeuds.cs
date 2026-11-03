@@ -16,8 +16,12 @@ public sealed record Entree(
         : Path.GetExtension(Nom).TrimStart('.').ToLowerInvariant();
 }
 
-/// <summary>Un point d'entrée du volet gauche.</summary>
-public sealed record Racine(string Libelle, string Detail, string Chemin);
+/// <summary>
+/// Un point d'entrée du volet gauche. L'icône est portée par la source et
+/// non devinée par l'écran : c'est elle qui sait qu'un lecteur est amovible
+/// ou optique.
+/// </summary>
+public sealed record Racine(string Libelle, string Detail, string Chemin, string Icone);
 
 /// <summary>
 /// Résultat d'un listage. Les erreurs sont comptées, pas levées : un dossier

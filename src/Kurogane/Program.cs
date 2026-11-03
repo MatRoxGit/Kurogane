@@ -8,7 +8,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.29.0";
+    private const string Version = "0.33.0";
 
     private static readonly IThemeModule[] Modules =
     {
@@ -54,6 +54,7 @@ internal static class Program
                 "probe-contraste" => CmdProbeContraste(args),
                 "contraste" => CmdContraste(args),
                 "probe-explorateur" => CmdProbeExplorateur(args),
+                "probe-pack" => CmdProbePack(args),
                 // Relais appele par le shell pendant l'essai d'ouverture.
                 // Sans journal : il doit etre invisible et rapide.
                 "preuve-ouverture" => ExplorateurProbe.Preuve(
@@ -588,6 +589,23 @@ internal static class Program
     }
 
     /// <summary>
+    /// Confronte le pack d'icônes à ce que le projet référence.
+    /// </summary>
+    private static int CmdProbePack(string[] args)
+    {
+        string? chemin = Flag(args, "--theme");
+
+        if (chemin is null)
+        {
+            Console.Error.WriteLine("Usage : kurogane probe-pack --theme <fichier.json>");
+            return 2;
+        }
+
+        using var journal = new Journal("probe-pack");
+        return PackProbe.Executer(journal, ThemeDefinition.Load(chemin));
+    }
+
+    /// <summary>
     /// Premier argument qui n'est ni une option, ni la valeur d'une option.
     /// </summary>
     private static string? Positionnel(string[] args)
@@ -1049,6 +1067,13 @@ internal static class Program
                   native, que Windows expose dans les Paramètres. Les .theme
                   livrés par Windows ne sont pas touchés.
                   Sans --commit, le fichier est affiché, pas écrit.
+
+              probe-pack --theme <fichier.json>
+                  Confronte le pack d'icônes à ce que le thème, la barre et
+                  la table des types de fichiers référencent. Signale les
+                  noms demandés sans fichier, et les fichiers que rien ne
+                  lit — c'est ce second cas qui est passé inaperçu deux jours
+                  durant. Lecture seule.
 
               probe-explorateur [--essai | --ouverture [--commit]]
                   Relève qui ouvre un dossier aujourd'hui, où c'est écrit, et
