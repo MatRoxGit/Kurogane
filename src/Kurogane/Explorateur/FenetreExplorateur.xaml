@@ -172,46 +172,80 @@
                 <Setter Property="FontSize" Value="10" />
             </Style>
 
-            <!-- Gabarit d'une carte. En XAML et non en C# : c'est ce qui
-                 permet au panneau de ne créer le contrôle qu'au moment où
-                 la carte entre à l'écran. -->
-            <DataTemplate x:Key="ModeleCarte" DataType="{x:Type k:CarteVue}">
-                <b:Biseau Coupe="8" Width="236" Height="62" Margin="0,0,10,10"
-                          Padding="12,0" Cursor="Hand"
-                          Background="{DynamicResource Surface}"
-                          BorderBrush="{DynamicResource Soudure}"
-                          BorderThickness="1"
-                          ToolTip="{Binding Chemin}">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Width="34" Height="34" Margin="0,0,12,0"
-                                VerticalAlignment="Center"
-                                Background="{DynamicResource Creux}"
-                                BorderBrush="{DynamicResource RougeEteint}"
-                                BorderThickness="1">
-                            <Image Source="{Binding Icone}" Width="24" Height="24"
-                                   Stretch="Uniform"
-                                   RenderOptions.BitmapScalingMode="HighQuality" />
-                        </Border>
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Nom}" MaxWidth="150"
-                                       Foreground="{DynamicResource TexteVif}"
-                                       FontFamily="{DynamicResource Mono}"
-                                       FontSize="11" FontWeight="Bold"
-                                       TextTrimming="CharacterEllipsis" />
-                            <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                                <TextBlock Text="{Binding Meta}"
-                                           Foreground="{DynamicResource TexteEteint}"
-                                           FontFamily="{DynamicResource Mono}" FontSize="9.5" />
-                                <TextBlock Text=" // " Foreground="{DynamicResource Rouge}"
-                                           FontFamily="{DynamicResource Mono}" FontSize="9.5" />
-                                <TextBlock Text="{Binding Date}"
-                                           Foreground="{DynamicResource TexteEteint}"
-                                           FontFamily="{DynamicResource Mono}" FontSize="9.5" />
-                            </StackPanel>
-                        </StackPanel>
-                    </StackPanel>
-                </b:Biseau>
-            </DataTemplate>
+            <!-- La carte est le gabarit du CONTENEUR, pas de la donnée.
+                 Un DataTemplate ne voit pas l'état de sélection : il est
+                 porté par le ListBoxItem qui l'entoure. En mettant la carte
+                 dans son template, les déclencheurs y accèdent directement. -->
+            <Style x:Key="CarteItem" TargetType="ListBoxItem">
+                <Setter Property="Margin" Value="0" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                            <b:Biseau x:Name="Coque" Coupe="8"
+                                      Width="236" Height="62"
+                                      Margin="0,0,10,10" Padding="12,0"
+                                      Cursor="Hand"
+                                      Background="{DynamicResource Surface}"
+                                      BorderBrush="{DynamicResource Soudure}"
+                                      BorderThickness="1"
+                                      ToolTip="{Binding Chemin}">
+                                <StackPanel Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                    <Border x:Name="Vignette" Width="34" Height="34"
+                                            Margin="0,0,12,0" VerticalAlignment="Center"
+                                            Background="{DynamicResource Creux}"
+                                            BorderBrush="{DynamicResource RougeEteint}"
+                                            BorderThickness="1">
+                                        <Image Source="{Binding Icone}" Width="24" Height="24"
+                                               Stretch="Uniform"
+                                               RenderOptions.BitmapScalingMode="HighQuality" />
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Nom}" MaxWidth="150"
+                                                   Foreground="{DynamicResource TexteVif}"
+                                                   FontFamily="{DynamicResource Mono}"
+                                                   FontSize="11" FontWeight="Bold"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                            <TextBlock Text="{Binding Meta}"
+                                                       Foreground="{DynamicResource TexteEteint}"
+                                                       FontFamily="{DynamicResource Mono}"
+                                                       FontSize="9.5" />
+                                            <TextBlock Text=" // "
+                                                       Foreground="{DynamicResource Rouge}"
+                                                       FontFamily="{DynamicResource Mono}"
+                                                       FontSize="9.5" />
+                                            <TextBlock Text="{Binding Date}"
+                                                       Foreground="{DynamicResource TexteEteint}"
+                                                       FontFamily="{DynamicResource Mono}"
+                                                       FontSize="9.5" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </b:Biseau>
+
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Coque" Property="BorderBrush"
+                                            Value="{DynamicResource RougeEteint}" />
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="Coque" Property="BorderBrush"
+                                            Value="{DynamicResource Rouge}" />
+                                    <Setter TargetName="Coque" Property="BorderThickness"
+                                            Value="1.5" />
+                                    <Setter TargetName="Coque" Property="Background"
+                                            Value="{DynamicResource Soudure}" />
+                                    <Setter TargetName="Vignette" Property="BorderBrush"
+                                            Value="{DynamicResource Rouge}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
 
         </ResourceDictionary>
     </Window.Resources>
@@ -380,26 +414,31 @@
                         </Grid>
                     </Border>
 
-                    <ItemsControl x:Name="Cartes" Grid.Row="1"
-                                  ItemTemplate="{StaticResource ModeleCarte}"
-                                  VirtualizingPanel.IsVirtualizing="True"
-                                  ScrollViewer.CanContentScroll="True">
-                        <ItemsControl.ItemsPanel>
+                    <ListBox x:Name="Cartes" Grid.Row="1"
+                             Background="Transparent" BorderThickness="0"
+                             Foreground="{DynamicResource TexteVif}"
+                             SelectionMode="Extended"
+                             ItemContainerStyle="{StaticResource CarteItem}"
+                             VirtualizingPanel.IsVirtualizing="True"
+                             ScrollViewer.CanContentScroll="True"
+                             KeyboardNavigation.DirectionalNavigation="Contained">
+                        <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <k:PanneauCartes LargeurCarte="246" HauteurCarte="72" />
                             </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.Template>
-                            <ControlTemplate TargetType="ItemsControl">
+                        </ListBox.ItemsPanel>
+                        <ListBox.Template>
+                            <ControlTemplate TargetType="ListBox">
                                 <ScrollViewer CanContentScroll="True"
                                               VerticalScrollBarVisibility="Auto"
                                               HorizontalScrollBarVisibility="Disabled"
-                                              Padding="14,0,14,14">
+                                              Padding="14,0,14,14"
+                                              Focusable="False">
                                     <ItemsPresenter />
                                 </ScrollViewer>
                             </ControlTemplate>
-                        </ItemsControl.Template>
-                    </ItemsControl>
+                        </ListBox.Template>
+                    </ListBox>
                 </Grid>
             </Grid>
 
@@ -415,8 +454,8 @@
                     <TextBlock x:Name="Erreurs" Style="{StaticResource Etiquette}" Text="0 ERREUR" />
                     <Rectangle Width="1" Height="12" Fill="{DynamicResource Soudure}"
                                Margin="14,0" />
-                    <TextBlock Style="{StaticResource Etiquette}"
-                               Text="CANAL ALPHA : 32-BIT RGBA" />
+                    <TextBlock x:Name="Detail" Style="{StaticResource Etiquette}"
+                               Text="—" />
                     <Rectangle Width="1" Height="12" Fill="{DynamicResource Soudure}"
                                Margin="14,0" />
                     <TextBlock x:Name="Chrono" Style="{StaticResource Etiquette}"

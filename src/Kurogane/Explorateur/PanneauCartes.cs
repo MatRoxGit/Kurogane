@@ -40,6 +40,13 @@ public sealed class PanneauCartes : VirtualizingPanel, IScrollInfo
     }
 
     private int _colonnes = 1;
+
+    /// <summary>
+    /// Nombre de cartes par ligne. Exposé pour la navigation au clavier :
+    /// dans une grille, Haut et Bas se déplacent d'une ligne entière, pas
+    /// d'un élément.
+    /// </summary>
+    public int Colonnes => _colonnes;
     private Size _etendue;
     private Size _fenetre;
     private Point _decalage;

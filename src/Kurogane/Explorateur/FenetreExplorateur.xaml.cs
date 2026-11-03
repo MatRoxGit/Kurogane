@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -61,6 +62,9 @@ public partial class FenetreExplorateur : Window
             e.Handled = true;
             await Ouvrir(vue.Source);
         };
+
+        Cartes.SelectionChanged += (_, _) => Detailler();
+        Cartes.PreviewKeyDown += Clavier;
 
         Puce.Text = $"PID:{Environment.ProcessId} // RING-3";
 
@@ -167,6 +171,7 @@ public partial class FenetreExplorateur : Window
         Cartes.ItemsSource = null;
         Compte.Text = "LECTURE…";
         Erreurs.Text = "";
+        Detail.Text = "—";
         Chrono.Text = "—";
 
         Listage listage;
@@ -205,9 +210,112 @@ public partial class FenetreExplorateur : Window
 
         rendu.Stop();
 
+        int noeuds   = listage.Entrees.Count(e => e.EstDossier);
+        int fichiers = listage.Entrees.Count - noeuds;
+        long poids   = listage.Entrees.Where(e => !e.EstDossier).Sum(e => e.Taille);
+
         Compte.Text  = $"{listage.Entrees.Count} OBJETS CHARGÉS";
         Erreurs.Text = $"{listage.Erreurs} ERREUR" + (listage.Erreurs > 1 ? "S" : "");
+        _resume = $"{noeuds} NOEUDS // {fichiers} FICHIERS // {Poids(poids)}";
+        Detail.Text = _resume;
+
+        // Sans le focus, les flèches et Entrée ne parviennent pas à la
+        // liste : l'utilisateur devrait cliquer une fois avant de pouvoir
+        // se servir du clavier.
+        Cartes.Focus();
         Chrono.Text  = $"LECTURE {listage.Millisecondes} MS // RENDU {rendu.ElapsedMilliseconds} MS";
+    }
+
+    /// <summary>
+    /// Résumé du dossier, réaffiché quand plus rien n'est sélectionné.
+    /// </summary>
+    private string _resume = "—";
+
+    /// <summary>
+    /// La barre d'état parle de la sélection quand il y en a une, du dossier
+    /// sinon. C'est l'endroit où l'utilisateur regarde ; y laisser une
+    /// mention décorative serait du gâchis.
+    /// </summary>
+    private void Detailler()
+    {
+        var choix = Cartes.SelectedItems.OfType<CarteVue>().ToList();
+
+        if (choix.Count == 0) { Detail.Text = _resume; return; }
+
+        if (choix.Count == 1)
+        {
+            var e = choix[0].Source;
+
+            Detail.Text = e.EstDossier
+                ? $"SÉLECTION : {e.Nom} // NOEUD"
+                : $"SÉLECTION : {e.Nom} // {Poids(e.Taille)} // {e.Modifie:yyyy.MM.dd HH:mm}";
+
+            return;
+        }
+
+        long poids = choix.Where(c => !c.Source.EstDossier).Sum(c => c.Source.Taille);
+
+        Detail.Text = $"SÉLECTION : {choix.Count} OBJETS // {Poids(poids)}";
+    }
+
+    /// <summary>
+    /// Navigation en grille. Les touches par défaut d'une ListBox se
+    /// déplacent d'un élément : dans une grille, Haut et Bas doivent sauter
+    /// une ligne entière.
+    /// </summary>
+    private async void Clavier(object expediteur, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            if (Cartes.SelectedItem is CarteVue vue)
+            {
+                e.Handled = true;
+                await Ouvrir(vue.Source);
+            }
+
+            return;
+        }
+
+        if (e.Key == Key.Back) { e.Handled = true; Monter(); return; }
+
+        if (e.Key is not (Key.Up or Key.Down or Key.Left or Key.Right)) return;
+        if (Cartes.Items.Count == 0) return;
+
+        int colonnes = Grille?.Colonnes ?? 1;
+        int actuel = Math.Max(0, Cartes.SelectedIndex);
+
+        int vise = e.Key switch
+        {
+            Key.Left  => actuel - 1,
+            Key.Right => actuel + 1,
+            Key.Up    => actuel - colonnes,
+            _         => actuel + colonnes,
+        };
+
+        if (vise < 0 || vise >= Cartes.Items.Count) { e.Handled = true; return; }
+
+        e.Handled = true;
+        Cartes.SelectedIndex = vise;
+        Cartes.ScrollIntoView(Cartes.Items[vise]);
+    }
+
+    /// <summary>Le panneau de cartes, une fois le gabarit appliqué.</summary>
+    private PanneauCartes? Grille =>
+        _grille ??= Trouver<PanneauCartes>(Cartes);
+
+    private PanneauCartes? _grille;
+
+    private static T? Trouver<T>(DependencyObject racine) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(racine); i++)
+        {
+            var enfant = VisualTreeHelper.GetChild(racine, i);
+
+            if (enfant is T trouve) return trouve;
+            if (Trouver<T>(enfant) is { } profond) return profond;
+        }
+
+        return null;
     }
 
     private void Ariane(string chemin)
