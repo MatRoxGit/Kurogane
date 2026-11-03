@@ -28,6 +28,12 @@ public partial class FenetreExplorateur : Window
     private readonly ThemeDefinition? _theme;
     private readonly ISourceNoeuds _source;
 
+    /// <summary>
+    /// Ouvrir d'un seul clic plutôt que de deux. Réglage du thème : les deux
+    /// habitudes existent, et imposer l'une des deux serait arbitraire.
+    /// </summary>
+    private readonly bool _simpleClic;
+
     private readonly List<string> _historique = new();
     private int _position = -1;
 
@@ -37,6 +43,7 @@ public partial class FenetreExplorateur : Window
     {
         _theme = theme;
         _source = source;
+        _simpleClic = theme?.Explorateur?.OuvertureSimpleClic ?? false;
 
         InitializeComponent();
 
@@ -56,7 +63,23 @@ public partial class FenetreExplorateur : Window
         // abonnements posés à leur création fuiraient ou disparaîtraient.
         Cartes.PreviewMouseLeftButtonDown += async (_, e) =>
         {
-            if (e.ClickCount < 2) return;
+            if (_simpleClic || e.ClickCount < 2) return;
+            if (Cible(e.OriginalSource) is not { } vue) return;
+
+            e.Handled = true;
+            await Ouvrir(vue.Source);
+        };
+
+        // En mode simple clic, l'ouverture se fait au relâchement et non à
+        // l'enfoncement : ouvrir sous le doigt avant qu'il se lève surprend,
+        // et empêche d'annuler en glissant hors de la carte.
+        Cartes.PreviewMouseLeftButtonUp += async (_, e) =>
+        {
+            if (!_simpleClic) return;
+
+            // Ctrl et Maj restent réservés à la sélection : sans ça, le mode
+            // simple clic rendrait toute sélection multiple impossible.
+            if (Keyboard.Modifiers is not ModifierKeys.None) return;
             if (Cible(e.OriginalSource) is not { } vue) return;
 
             e.Handled = true;
@@ -65,6 +88,39 @@ public partial class FenetreExplorateur : Window
 
         Cartes.SelectionChanged += (_, _) => Detailler();
         Cartes.PreviewKeyDown += Clavier;
+
+        Filtre.TextChanged += (_, _) => Appliquer();
+
+        // Un clic n'importe où dans la boîte donne le focus au champ, pas
+        // seulement sur les quelques pixels qu'occupe le texte.
+        BoiteFiltre.PreviewMouseLeftButtonDown += (_, e) =>
+        {
+            if (Filtre.IsKeyboardFocusWithin) return;
+
+            e.Handled = true;
+            Filtre.Focus();
+            Filtre.CaretIndex = Filtre.Text.Length;
+        };
+
+        Filtre.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Escape) return;
+
+            e.Handled = true;
+            Filtre.Clear();
+            Cartes.Focus();
+        };
+
+        // Ctrl+F depuis n'importe où amène au filtre, comme partout.
+        PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key != Key.F
+                || (Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
+
+            e.Handled = true;
+            Filtre.Focus();
+            Filtre.SelectAll();
+        };
 
         Puce.Text = $"PID:{Environment.ProcessId} // RING-3";
 
@@ -169,6 +225,11 @@ public partial class FenetreExplorateur : Window
         var jeton = _encours.Token;
 
         Cartes.ItemsSource = null;
+        _toutes = new List<CarteVue>();
+
+        // Un filtre hérité du dossier précédent masquerait le nouveau sans
+        // que rien ne l'explique.
+        if (Filtre.Text.Length > 0) Filtre.Clear();
         Compte.Text = "LECTURE…";
         Erreurs.Text = "";
         Detail.Text = "—";
@@ -201,7 +262,8 @@ public partial class FenetreExplorateur : Window
                 Icone  = ChargerIcone(entree),
             });
 
-        Cartes.ItemsSource = vues;
+        _toutes = vues;
+        Appliquer();
 
         // La mesure doit inclure la mise en page, sinon elle ne compte que
         // la construction de la liste et déclare un rendu instantané qui
@@ -214,7 +276,6 @@ public partial class FenetreExplorateur : Window
         int fichiers = listage.Entrees.Count - noeuds;
         long poids   = listage.Entrees.Where(e => !e.EstDossier).Sum(e => e.Taille);
 
-        Compte.Text  = $"{listage.Entrees.Count} OBJETS CHARGÉS";
         Erreurs.Text = $"{listage.Erreurs} ERREUR" + (listage.Erreurs > 1 ? "S" : "");
         _resume = $"{noeuds} NOEUDS // {fichiers} FICHIERS // {Poids(poids)}";
         Detail.Text = _resume;
@@ -230,6 +291,52 @@ public partial class FenetreExplorateur : Window
     /// Résumé du dossier, réaffiché quand plus rien n'est sélectionné.
     /// </summary>
     private string _resume = "—";
+
+    /// <summary>
+    /// Le dossier entier, indépendamment du filtre. Filtrer ne relit jamais
+    /// le disque : la liste est déjà là, et un aller-retour par frappe
+    /// rendrait le champ inutilisable sur un dossier lent.
+    /// </summary>
+    private List<CarteVue> _toutes = new();
+
+    /// <summary>
+    /// Applique le filtre courant. Deux formes reconnues : « *.ext » ne
+    /// garde que cette extension, tout le reste est cherché dans le nom,
+    /// sans tenir compte de la casse ni de l'accentuation du motif.
+    /// </summary>
+    private void Appliquer()
+    {
+        string motif = Filtre.Text.Trim();
+
+        Invite.Visibility = motif.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        IReadOnlyList<CarteVue> visibles;
+
+        if (motif.Length == 0)
+        {
+            visibles = _toutes;
+        }
+        else if (motif.StartsWith("*.", StringComparison.Ordinal) && motif.Length > 2)
+        {
+            string ext = motif[2..].TrimEnd('_');
+
+            visibles = _toutes
+                .Where(c => c.Source.Extension.Equals(ext, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+        else
+        {
+            visibles = _toutes
+                .Where(c => c.Nom.Contains(motif, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        Cartes.ItemsSource = visibles;
+
+        Compte.Text = motif.Length == 0
+            ? $"{_toutes.Count} OBJETS CHARGÉS"
+            : $"{visibles.Count} / {_toutes.Count} FILTRÉS";
+    }
 
     /// <summary>
     /// La barre d'état parle de la sélection quand il y en a une, du dossier

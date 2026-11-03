@@ -176,6 +176,34 @@
                  Un DataTemplate ne voit pas l'état de sélection : il est
                  porté par le ListBoxItem qui l'entoure. En mettant la carte
                  dans son template, les déclencheurs y accèdent directement. -->
+            <!-- Gabarit propre au champ de saisie. Sous un thème de
+                 contraste, WPF bascule sur ses gabarits d'accessibilité, qui
+                 redessinent une bordure à partir de WindowText — blanche
+                 ici — en ignorant BorderThickness. Définir le gabarit
+                 soustrait le champ à ce mécanisme. -->
+            <Style x:Key="ChampNu" TargetType="TextBox">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Foreground" Value="{DynamicResource TexteVif}" />
+                <Setter Property="CaretBrush" Value="{DynamicResource Rouge}" />
+                <Setter Property="SelectionBrush" Value="{DynamicResource Rouge}" />
+                <Setter Property="SelectionOpacity" Value="0.4" />
+                <Setter Property="FontFamily" Value="{DynamicResource Mono}" />
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="VerticalContentAlignment" Value="Center" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TextBox">
+                            <ScrollViewer x:Name="PART_ContentHost" Focusable="False"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Hidden" />
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <Style x:Key="CarteItem" TargetType="ListBoxItem">
                 <Setter Property="Margin" Value="0" />
                 <Setter Property="Padding" Value="0" />
@@ -338,19 +366,58 @@
                                 VerticalAlignment="Center" />
                 </Border>
 
-                <Border Grid.Column="2" Height="28" Margin="10,0,12,0"
-                        VerticalAlignment="Center"
-                        Background="{DynamicResource Creux}"
-                        BorderBrush="{DynamicResource Soudure}" BorderThickness="1"
-                        Padding="10,0">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="⌕" Foreground="{DynamicResource TexteEteint}"
-                                   FontSize="12" Margin="0,0,8,0"
+                <!-- La boîte entière EST le champ. L'étiquette « FILTRER »
+                     en tête se lisait comme un libellé et laissait croire
+                     que la saisie se faisait ailleurs : elle devient
+                     l'invite, à l'intérieur, et disparaît à la frappe. -->
+                <Border x:Name="BoiteFiltre" Grid.Column="2" Height="28"
+                        Margin="10,0,12,0" VerticalAlignment="Center"
+                        BorderThickness="1" Padding="10,0" Cursor="IBeam">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock x:Name="Loupe" Grid.Column="0" Text="⌕"
+                                   Foreground="{DynamicResource TexteEteint}"
+                                   FontSize="13" Margin="0,0,9,0"
                                    VerticalAlignment="Center" />
-                        <TextBlock Style="{StaticResource Etiquette}" Text="FILTRER" />
-                        <TextBlock Style="{StaticResource Separateur}" />
-                        <TextBlock Style="{StaticResource Segment}" Text="*.ICO_" />
-                    </StackPanel>
+
+                        <Grid Grid.Column="1">
+                            <TextBlock x:Name="Invite" IsHitTestVisible="False"
+                                       VerticalAlignment="Center"
+                                       FontFamily="{DynamicResource Mono}" FontSize="11">
+                                <Run Text="FILTRER" Foreground="#FF8C6268" />
+                                <Run Text=" // " Foreground="#FF3A1016" />
+                                <Run Text="NOM OU *.EXT" Foreground="#FF8C6268" />
+                            </TextBlock>
+
+                            <TextBox x:Name="Filtre" Style="{StaticResource ChampNu}"
+                                     HorizontalAlignment="Stretch" />
+                        </Grid>
+                    </Grid>
+
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <!-- En Setter et non en attribut : une valeur
+                                 posée localement sur l'élément l'emporte sur
+                                 un déclencheur, et le liseré au focus ne
+                                 s'afficherait jamais. -->
+                            <Setter Property="Background" Value="{DynamicResource Creux}" />
+                            <Setter Property="BorderBrush" Value="{DynamicResource Soudure}" />
+                            <Style.Triggers>
+                                <!-- Le liseré rouge au focus : le seul signal
+                                     qui dise sans ambiguïté où va la frappe. -->
+                                <DataTrigger Value="True"
+                                             Binding="{Binding IsKeyboardFocusWithin,
+                                                       RelativeSource={RelativeSource Self}}">
+                                    <Setter Property="BorderBrush"
+                                            Value="{DynamicResource RougeEteint}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                 </Border>
             </Grid>
 

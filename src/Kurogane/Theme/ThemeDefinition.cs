@@ -20,6 +20,7 @@ public sealed class ThemeDefinition
     public BarreSection?    Barre     { get; set; }
     public FenetresSection? Fenetres  { get; set; }
     public ContrasteSection? Contraste { get; set; }
+    public ExplorateurSection? Explorateur { get; set; }
 
     /// <summary>Dossier d'où le thème a été chargé — sert à résoudre les chemins relatifs.</summary>
     [JsonIgnore]
@@ -213,6 +214,16 @@ public sealed class ContrasteSection
 
     /// <summary>Cadre de fenêtre, en accord avec le liseré posé par DWM.</summary>
     public string Cadre { get; set; } = "#C8102E";
+}
+
+/// <summary>Réglages de l'explorateur Kurogane.</summary>
+public sealed class ExplorateurSection
+{
+    /// <summary>
+    /// Ouvrir d'un seul clic plutôt que de deux. Les deux habitudes
+    /// existent ; le défaut suit celui de Windows.
+    /// </summary>
+    public bool? OuvertureSimpleClic { get; set; }
 }
 
 public sealed class TaskbarStyleSection
