@@ -582,11 +582,24 @@ Découvert sur un cadre blanc autour du champ de filtre. Six contrôles ont dû
 
 ### Ce qui manque
 
-Clic droit, actions sur les fichiers, recherche récursive. L'étape des
-actions est la plus délicate du projet : « rien d'irréversible » y cessera
-de parler de clés de registre pour parler des fichiers de l'utilisateur —
-corbeille et jamais suppression définitive, aucun écrasement silencieux,
-aucune opération de masse sans confirmation.
+Clic droit, actions sur les fichiers, recherche récursive.
+
+Une nuance à poser avant d'y toucher, parce qu'elle décide du comportement :
+**« rien d'irréversible » encadre ce que Kurogane décide, pas ce que
+l'utilisateur demande.**
+
+Supprimer un fichier est une décision de l'utilisateur. Kurogane l'exécute
+comme le ferait l'Explorateur — corbeille par défaut, suppression définitive
+sur Maj+Suppr — parce que c'est la convention du système et ce qu'on attend
+d'un gestionnaire de fichiers. Se montrer plus prudent que l'Explorateur sur
+un geste explicite serait un défaut, pas une vertu : l'outil se méfierait de
+son utilisateur.
+
+La règle vaut pour ce que Kurogane entreprend de lui-même. Les modifications
+du système par `apply` en relèvent, et c'est pour elles que le socle existe.
+Le **mode de rangement automatique** du cahier des charges en relèvera plus
+encore : là, Kurogane décidera fichier par fichier sans validation
+individuelle, et chaque déplacement devra être journalisé et défaisable.
 
 ## État
 
