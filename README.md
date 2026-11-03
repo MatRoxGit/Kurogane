@@ -115,13 +115,6 @@ Vérifier que le pack d'icônes et le projet sont d'accord :
 kurogane probe-pack --theme themes\kurogane-obsidian.json
 ```
 
-Restylage de la barre des tâches, à chaud et sans rien écrire :
-
-```
-kurogane taskbar-style --marge 12 --marge-basse 6 --rayon 10 --teinte "#C8102E"
-kurogane taskbar-style --reinitialiser
-```
-
 Substitution d'icônes dans un binaire du shell — voir *Niveau 3* plus bas :
 
 ```
@@ -374,44 +367,6 @@ par-dessus un fichier mis à jour annulerait un correctif de sécurité.
 Ces deux conséquences sont inhérentes à la méthode. Elles ne sont pas
 corrigeables, seulement annoncées.
 
-## Restylage à chaud de la barre des tâches
-
-Les réglages de registre ne changent que la disposition. Pour transformer
-l'apparence, Kurogane restyle la **fenêtre vivante** — comme le font
-TranslucentTB et RoundedTB, et contrairement à ExplorerPatcher ou Start11 qui
-injectent du code dans `explorer.exe`.
-
-```
-kurogane taskbar-style --marge 12 --marge-basse 6 --rayon 10 --teinte "#C8102E" --opacite 180
-kurogane taskbar-style --reinitialiser
-```
-
-`SetWindowRgn` sur `Shell_TrayWnd` découpe la barre en rectangle arrondi —
-le découpage s'applique aussi aux fenêtres filles, pont XAML compris.
-`SetWindowCompositionAttribute` y pose une teinte acrylique.
-
-**Rien n'est écrit.** C'est le mécanisme le plus réversible du projet : il
-n'y a aucun état à restaurer, seulement un effet à cesser d'appliquer. Un
-redémarrage d'explorer suffit à tout rendre à l'origine.
-
-Revers de la médaille : l'effet ne survit ni à un redémarrage d'explorer, ni
-à un changement de résolution. Le rendre permanent demande un compagnon
-résident qui le repose sur l'événement `TaskbarCreated`.
-
-Deux choses à savoir :
-
-- **On découpe, on ne redimensionne pas.** Avec des icônes alignées à gauche
-  et la zone de notification à droite, le contenu occupe toute la largeur :
-  une marge latérale trop grande rogne l'horloge. Le « dock flottant »
-  suppose des icônes centrées.
-- **Le processus doit être sensible au DPI.** Sans ça, Windows virtualise
-  les coordonnées et la région est posée de travers : sur un écran à 125 %,
-  la zone de notification disparaît.
-
-`SetWindowCompositionAttribute` n'est pas documenté par Microsoft. Il
-fonctionne depuis des années, mais un échec est traité comme une réponse
-possible, pas comme une anomalie.
-
 ## La barre Kurogane
 
 Le restylage ci-dessus ne change que l'enveloppe : marges, coins, teinte. La
@@ -437,6 +392,33 @@ déborder, pour tenir sur n'importe quelle résolution.
 autant que dans le `finally` : une exception, un Ctrl+C ou un arrêt brutal
 rendent la barre de Windows. Laisser un utilisateur sans barre des tâches
 serait la pire sortie possible pour un projet qui promet la réversibilité.
+
+### La voie précédente — restylage de la barre de Windows
+
+Avant le remplacement, Kurogane restylait la **fenêtre vivante** de la barre
+Windows : `SetWindowRgn` sur `Shell_TrayWnd` pour la découper,
+`SetWindowCompositionAttribute` pour y poser une teinte.
+
+```
+kurogane taskbar-style --marge 12 --rayon 10 --teinte "#C8102E"
+kurogane taskbar-style --reinitialiser
+kurogane resident --theme themes\kurogane-obsidian.json
+```
+
+Les commandes existent toujours, mais **cette voie ne mène pas au thème
+visé** : la barre de Windows 11 est dessinée en XAML, et le restylage ne
+touche que son enveloppe. C'est ce constat qui a conduit au remplacement
+décrit ci-dessus.
+
+Deux mesures en sont restées, valables pour toute manipulation de fenêtre
+système :
+
+- **Le processus doit être sensible au DPI.** Sans ça, Windows virtualise
+  les coordonnées : sur un écran à 125 %, la région est posée de travers et
+  la zone de notification disparaît.
+- **La teinte n'a jamais pris.** Le pont XAML peint par-dessus.
+  `SetWindowCompositionAttribute` n'est d'ailleurs pas documenté par
+  Microsoft : un échec y est une réponse possible, pas une anomalie.
 
 ## Habillage des fenêtres
 
