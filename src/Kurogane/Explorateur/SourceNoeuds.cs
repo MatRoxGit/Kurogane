@@ -48,6 +48,13 @@ public interface ISourceNoeuds
 
     Task<Listage> Lister(string chemin, CancellationToken jeton);
 
+    /// <summary>
+    /// Les sous-dossiers seulement. L'arbre n'affiche pas les fichiers :
+    /// les lister pour les écarter ensuite ferait payer un dossier chargé
+    /// sans rien montrer de plus.
+    /// </summary>
+    Task<IReadOnlyList<Entree>> Dossiers(string chemin, CancellationToken jeton);
+
     string? Parent(string chemin);
 
     /// <summary>Le chemin découpé pour le fil d'Ariane.</summary>

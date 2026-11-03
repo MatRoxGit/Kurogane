@@ -14,7 +14,7 @@ public sealed class SourceFichiers : ISourceNoeuds
     /// chemins réels, pas des éléments de l'espace de noms : « Ce PC » et
     /// « Réseau » viendront avec l'implémentation shell.
     /// </summary>
-    private static readonly (string Sous, string Libelle, string Icone)[] Dossiers =
+    private static readonly (string Sous, string Libelle, string Icone)[] DossiersConnus =
     {
         ("",              "ACCUEIL",    "accueil"),
         ("Desktop",       "BUREAU",     "bureau"),
@@ -50,7 +50,7 @@ public sealed class SourceFichiers : ISourceNoeuds
 
         string profil = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-        foreach (var (sous, libelle, icone) in Dossiers)
+        foreach (var (sous, libelle, icone) in DossiersConnus)
         {
             // Les dossiers du profil portent un nom anglais sur le disque,
             // même sur un Windows français : c'est l'affichage qui est
@@ -149,6 +149,47 @@ public sealed class SourceFichiers : ISourceNoeuds
         dossiers.AddRange(fichiers);
 
         return new Listage(dossiers, erreurs, 0);
+    }
+
+    public async Task<IReadOnlyList<Entree>> Dossiers(string chemin, CancellationToken jeton)
+    {
+        return await Task.Run(IReadOnlyList<Entree> () =>
+        {
+            var liste = new List<Entree>();
+
+            try
+            {
+                foreach (var sous in Directory.EnumerateDirectories(chemin))
+                {
+                    jeton.ThrowIfCancellationRequested();
+
+                    try
+                    {
+                        var info = new DirectoryInfo(sous);
+
+                        if (info.Attributes.HasFlag(FileAttributes.Hidden)
+                            && info.Attributes.HasFlag(FileAttributes.System)) continue;
+
+                        liste.Add(new Entree(info.Name, info.FullName, true, 0,
+                            info.LastWriteTime));
+                    }
+                    catch (Exception)
+                    {
+                        // Un sous-dossier illisible ne doit pas vider la branche.
+                    }
+                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception)
+            {
+                // Dossier inaccessible : branche vide, pas d'exception
+                // remontée jusqu'à l'interface.
+            }
+
+            liste.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Nom, b.Nom));
+
+            return liste;
+        }, jeton).ConfigureAwait(false);
     }
 
     public string? Parent(string chemin)

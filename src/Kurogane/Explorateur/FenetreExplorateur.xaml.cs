@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Kurogane.Barre;
 using Kurogane.Theme;
 
@@ -91,6 +92,26 @@ public partial class FenetreExplorateur : Window
 
         Filtre.TextChanged += (_, _) => Appliquer();
 
+        foreach (var (bouton, critere) in new (RadioButton, Critere)[]
+                 {
+                     (TriNom,    Critere.Nom),
+                     (TriTaille, Critere.Taille),
+                     (TriDate,   Critere.Date),
+                     (TriType,   Critere.Type),
+                 })
+        {
+            var choisi = critere;
+            bouton.Checked += (_, _) => { _critere = choisi; Appliquer(); Ordonnancer(); };
+        }
+
+        BtnSens.Click += (_, _) =>
+        {
+            _croissant = !_croissant;
+            BtnSens.Content = _croissant ? "▲" : "▼";
+            Appliquer();
+            Ordonnancer();
+        };
+
         // Un clic n'importe où dans la boîte donne le focus au champ, pas
         // seulement sur les quelques pixels qu'occupe le texte.
         BoiteFiltre.PreviewMouseLeftButtonDown += (_, e) =>
@@ -124,6 +145,19 @@ public partial class FenetreExplorateur : Window
 
         Puce.Text = $"PID:{Environment.ProcessId} // RING-3";
 
+        Arbre.AddHandler(TreeViewItem.ExpandedEvent, new RoutedEventHandler(SurExpansion));
+
+        Arbre.SelectedItemChanged += async (_, e) =>
+        {
+            if (e.NewValue is not NoeudArbre noeud) return;
+            if (noeud.EstFictif) return;
+            if (_position >= 0 && _historique[_position] == noeud.Chemin) return;
+
+            // Pas de vol de focus : qui clique dans l'arbre veut continuer
+            // au clavier dans l'arbre. Le focus suit l'endroit où l'on agit.
+            await Naviguer(noeud.Chemin, rendreFocus: false);
+        };
+
         RemplirRacines();
 
         Loaded += async (_, _) => await Naviguer(depart);
@@ -137,72 +171,63 @@ public partial class FenetreExplorateur : Window
     private void RemplirRacines()
     {
         foreach (var racine in _source.Racines())
-            Noeuds.Children.Add(Noeud(racine));
+            Arbre.Items.Add(Brancher(racine.Libelle, racine.Detail,
+                racine.Chemin, racine.Icone));
     }
 
-    private UIElement Noeud(Racine racine)
+    private NoeudArbre Brancher(string libelle, string detail, string chemin, string icone)
     {
-        var ligne = new StackPanel { Orientation = Orientation.Horizontal };
-
-        var vignette = new Border
+        var noeud = new NoeudArbre
         {
-            Width = 20,
-            Height = 20,
-            Margin = new Thickness(0, 0, 10, 0),
-            VerticalAlignment = VerticalAlignment.Center,
+            Libelle = libelle,
+            Detail  = detail,
+            Chemin  = chemin,
+            Icone   = Icone(icone + ".ico"),
         };
 
-        if (Icone(racine.Icone + ".ico") is { } dessin)
-        {
-            var image = new Image { Source = dessin, Stretch = Stretch.Uniform };
-            RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
-            vignette.Child = image;
-        }
-        else
-        {
-            // Icône pas encore dessinée : le carré d'origine, plutôt qu'un
-            // vide qui décalerait l'alignement de la ligne.
-            vignette.Child = new TextBlock
-            {
-                Text = "▱",
-                FontSize = 12,
-                Foreground = (Brush)FindResource("TexteEteint"),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-            };
-        }
-
-        ligne.Children.Add(vignette);
-
-        ligne.Children.Add(Mono(racine.Libelle, "TexteVif", 11));
-        ligne.Children.Add(Mono(" // ", "RougeEteint", 11));
-        ligne.Children.Add(Mono(racine.Detail, "TexteVif", 11));
-
-        var noeud = new ContentControl
-        {
-            Style = (Style)FindResource("Noeud"),
-            Content = ligne,
-            Cursor = Cursors.Hand,
-            Tag = racine.Chemin,
-        };
-
-        noeud.MouseLeftButtonUp += async (_, _) => await Naviguer(racine.Chemin);
+        noeud.Enfants.Add(NoeudArbre.Fictif(chemin));
 
         return noeud;
     }
 
-    private TextBlock Mono(string texte, string pinceau, double taille) => new()
+    /// <summary>
+    /// Lit le contenu d'une branche au moment où on l'ouvre.
+    ///
+    /// L'événement remonte depuis le nœud déplié, donc un seul abonnement
+    /// sur l'arbre suffit — en poser un par nœud fuirait au fil des
+    /// dépliages.
+    /// </summary>
+    private async void SurExpansion(object expediteur, RoutedEventArgs e)
     {
-        Text = texte,
-        Foreground = (Brush)FindResource(pinceau),
-        FontFamily = (FontFamily)FindResource("Mono"),
-        FontSize = taille,
-        VerticalAlignment = VerticalAlignment.Center,
-    };
+        if (e.OriginalSource is not TreeViewItem item) return;
+        if (item.DataContext is not NoeudArbre noeud) return;
+        if (noeud.Charge) return;
+
+        noeud.Charge = true;
+
+        IReadOnlyList<Entree> sous;
+
+        try
+        {
+            sous = await _source.Dossiers(noeud.Chemin, CancellationToken.None);
+        }
+        catch (Exception)
+        {
+            noeud.Enfants.Clear();
+            return;
+        }
+
+        noeud.Enfants.Clear();
+
+        foreach (var d in sous)
+            noeud.Enfants.Add(Brancher("DOSSIER", d.Nom.ToUpperInvariant(),
+                d.Chemin, "dossier"));
+    }
 
     // ----------------------------------------------------------- navigation
 
-    private async Task Naviguer(string chemin, bool enregistrer = true)
+    private async Task Naviguer(string chemin, bool enregistrer = true,
+        bool rendreFocus = true)
     {
         if (enregistrer)
         {
@@ -280,10 +305,17 @@ public partial class FenetreExplorateur : Window
         _resume = $"{noeuds} NOEUDS // {fichiers} FICHIERS // {Poids(poids)}";
         Detail.Text = _resume;
 
-        // Sans le focus, les flèches et Entrée ne parviennent pas à la
-        // liste : l'utilisateur devrait cliquer une fois avant de pouvoir
-        // se servir du clavier.
-        Cartes.Focus();
+        // Le focus part à la liste, pour que les flèches et Entrée servent
+        // sans un clic préalable.
+        //
+        // Différé à la priorité Input : quand la navigation vient d'un clic
+        // dans l'arbre, le TreeViewItem prend le focus APRÈS l'événement de
+        // sélection. L'appeler tout de suite le ferait reprendre aussitôt.
+        // Rejet explicite : BeginInvoke renvoie une opération attendable, et
+        // on ne veut justement pas l'attendre — la navigation est finie, le
+        // focus se pose quand le clic en cours aura fini de se propager.
+        if (rendreFocus)
+            _ = Dispatcher.BeginInvoke(DispatcherPriority.Input, () => Cartes.Focus());
         Chrono.Text  = $"LECTURE {listage.Millisecondes} MS // RENDU {rendu.ElapsedMilliseconds} MS";
     }
 
@@ -291,6 +323,56 @@ public partial class FenetreExplorateur : Window
     /// Résumé du dossier, réaffiché quand plus rien n'est sélectionné.
     /// </summary>
     private string _resume = "—";
+
+    /// <summary>Libellé du sens de tri, adapté au critère courant.</summary>
+    private void Ordonnancer() => Ordre.Text = (_critere, _croissant) switch
+    {
+        (Critere.Taille, true)  => "PETIT → GRAND",
+        (Critere.Taille, false) => "GRAND → PETIT",
+        (Critere.Date, true)    => "ANCIEN → RÉCENT",
+        (Critere.Date, false)   => "RÉCENT → ANCIEN",
+        (_, true)               => "A → Z",
+        _                       => "Z → A",
+    };
+
+    private enum Critere { Nom, Taille, Date, Type }
+
+    private Critere _critere = Critere.Nom;
+    private bool _croissant = true;
+
+    /// <summary>
+    /// Trie, dossiers en tête quelle que soit la clé.
+    ///
+    /// Mélanger dossiers et fichiers dans un tri par taille mettrait les
+    /// dossiers — de taille nulle ici — tous au même bout, ce qui n'apprend
+    /// rien. Les séparer est aussi ce que fait tout gestionnaire de
+    /// fichiers, et déroger à cette habitude sans raison coûterait plus
+    /// qu'elle ne rapporte.
+    /// </summary>
+    private IEnumerable<CarteVue> Trier(IEnumerable<CarteVue> source)
+    {
+        var casse = StringComparer.OrdinalIgnoreCase;
+
+        Func<CarteVue, IComparable> cle = _critere switch
+        {
+            Critere.Taille => c => c.Source.Taille,
+            Critere.Date   => c => c.Source.Modifie,
+            Critere.Type   => c => c.Source.Extension,
+            _              => c => c.Nom,
+        };
+
+        var ordonne = source
+            .OrderBy(c => c.Source.EstDossier ? 0 : 1);
+
+        // Le nom départage toujours : deux fichiers de même taille ou de
+        // même date s'afficheraient sinon dans un ordre instable d'une
+        // lecture à l'autre.
+        ordonne = _croissant
+            ? ordonne.ThenBy(cle).ThenBy(c => c.Nom, casse)
+            : ordonne.ThenByDescending(cle).ThenBy(c => c.Nom, casse);
+
+        return ordonne;
+    }
 
     /// <summary>
     /// Le dossier entier, indépendamment du filtre. Filtrer ne relit jamais
@@ -310,26 +392,22 @@ public partial class FenetreExplorateur : Window
 
         Invite.Visibility = motif.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
 
-        IReadOnlyList<CarteVue> visibles;
+        IEnumerable<CarteVue> retenues = _toutes;
 
-        if (motif.Length == 0)
-        {
-            visibles = _toutes;
-        }
-        else if (motif.StartsWith("*.", StringComparison.Ordinal) && motif.Length > 2)
+        if (motif.StartsWith("*.", StringComparison.Ordinal) && motif.Length > 2)
         {
             string ext = motif[2..].TrimEnd('_');
 
-            visibles = _toutes
-                .Where(c => c.Source.Extension.Equals(ext, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            retenues = _toutes.Where(c =>
+                c.Source.Extension.Equals(ext, StringComparison.OrdinalIgnoreCase));
         }
-        else
+        else if (motif.Length > 0)
         {
-            visibles = _toutes
-                .Where(c => c.Nom.Contains(motif, StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            retenues = _toutes.Where(c =>
+                c.Nom.Contains(motif, StringComparison.OrdinalIgnoreCase));
         }
+
+        var visibles = Trier(retenues).ToList();
 
         Cartes.ItemsSource = visibles;
 

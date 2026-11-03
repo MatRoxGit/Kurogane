@@ -204,6 +204,251 @@
                 </Setter>
             </Style>
 
+            <!-- Bouton de tri. RadioButton pour l'exclusivité mutuelle,
+                 mais entièrement regabarité : le rond système reviendrait
+                 habillé par le thème de contraste, comme tout le reste. -->
+            <Style x:Key="BoutonTri" TargetType="RadioButton">
+                <Setter Property="Margin" Value="0,0,18,0" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RadioButton">
+                            <StackPanel Background="Transparent">
+                                <TextBlock x:Name="Libelle"
+                                           Text="{TemplateBinding Content}"
+                                           Foreground="{DynamicResource TexteEteint}"
+                                           FontFamily="{DynamicResource Mono}"
+                                           FontSize="10" />
+                                <Rectangle x:Name="Trait" Height="1.5" Margin="0,3,0,0"
+                                           Fill="Transparent" />
+                            </StackPanel>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Libelle" Property="Foreground"
+                                            Value="{DynamicResource TexteVif}" />
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="Libelle" Property="Foreground"
+                                            Value="{DynamicResource TexteVif}" />
+                                    <Setter TargetName="Trait" Property="Fill"
+                                            Value="{DynamicResource Rouge}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="Separation" TargetType="GridSplitter">
+                <Setter Property="Width" Value="5" />
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                <Setter Property="VerticalAlignment" Value="Stretch" />
+                <Setter Property="Cursor" Value="SizeWE" />
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="GridSplitter">
+                            <Border x:Name="Rail" Background="Transparent">
+                                <Rectangle x:Name="Trait" Width="1"
+                                           HorizontalAlignment="Center"
+                                           Fill="{DynamicResource Soudure}" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Trait" Property="Fill"
+                                            Value="{DynamicResource Rouge}" />
+                                    <Setter TargetName="Trait" Property="Width" Value="2" />
+                                </Trigger>
+                                <Trigger Property="IsDragging" Value="True">
+                                    <Setter TargetName="Trait" Property="Fill"
+                                            Value="{DynamicResource Rouge}" />
+                                    <Setter TargetName="Trait" Property="Width" Value="2" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Barre de défilement. Troisième contrôle standard à devoir
+                 son gabarit : sous un thème de contraste, celui de WPF la
+                 dessine en WindowText, soit presque blanc ici. Styles
+                 implicites, pour qu'elle vaille partout dans la fenêtre. -->
+            <Style x:Key="PisteBarre" TargetType="RepeatButton">
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="IsTabStop" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RepeatButton">
+                            <Border Background="Transparent" />
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="PouceBarre" TargetType="Thumb">
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="IsTabStop" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Thumb">
+                            <Border x:Name="Corps" Margin="2,0"
+                                    Background="{DynamicResource Soudure}" />
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Corps" Property="Background"
+                                            Value="{DynamicResource RougeEteint}" />
+                                </Trigger>
+                                <Trigger Property="IsDragging" Value="True">
+                                    <Setter TargetName="Corps" Property="Background"
+                                            Value="{DynamicResource Rouge}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style TargetType="ScrollBar">
+                <Setter Property="Width" Value="11" />
+                <Setter Property="MinWidth" Value="11" />
+                <Setter Property="Background" Value="{DynamicResource Creux}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ScrollBar">
+                            <Border Background="{TemplateBinding Background}"
+                                    BorderBrush="{DynamicResource Soudure}"
+                                    BorderThickness="1,0,0,0">
+                                <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                    <Track.DecreaseRepeatButton>
+                                        <RepeatButton Style="{StaticResource PisteBarre}"
+                                                      Command="ScrollBar.PageUpCommand" />
+                                    </Track.DecreaseRepeatButton>
+                                    <Track.Thumb>
+                                        <Thumb Style="{StaticResource PouceBarre}" />
+                                    </Track.Thumb>
+                                    <Track.IncreaseRepeatButton>
+                                        <RepeatButton Style="{StaticResource PisteBarre}"
+                                                      Command="ScrollBar.PageDownCommand" />
+                                    </Track.IncreaseRepeatButton>
+                                </Track>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Poignée de dépliage : un chevron, pas le triangle système,
+                 qui serait redessiné par le thème de contraste. -->
+            <Style x:Key="Poignee" TargetType="ToggleButton">
+                <Setter Property="Width" Value="16" />
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <Border Background="Transparent">
+                                <TextBlock x:Name="Chevron" Text="›"
+                                           Foreground="{DynamicResource TexteEteint}"
+                                           FontFamily="{DynamicResource Mono}"
+                                           FontSize="13"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="Chevron" Property="Text" Value="⌄" />
+                                    <Setter TargetName="Chevron" Property="Foreground"
+                                            Value="{DynamicResource Rouge}" />
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Chevron" Property="Foreground"
+                                            Value="{DynamicResource Rouge}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="NoeudArbreItem" TargetType="TreeViewItem">
+                <Setter Property="Foreground" Value="{DynamicResource TexteEteint}" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TreeViewItem">
+                            <StackPanel>
+                                <Border x:Name="Ligne" Height="32"
+                                        Background="Transparent"
+                                        BorderBrush="Transparent"
+                                        BorderThickness="2,0,0,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="18" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <ToggleButton x:Name="Expander" Grid.Column="0"
+                                                      Style="{StaticResource Poignee}"
+                                                      ClickMode="Press"
+                                                      IsChecked="{Binding IsExpanded,
+                                                          RelativeSource={RelativeSource TemplatedParent}}" />
+
+                                        <ContentPresenter Grid.Column="1"
+                                                          ContentSource="Header"
+                                                          VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+
+                                <ItemsPresenter x:Name="Branches" Margin="14,0,0,0" />
+                            </StackPanel>
+
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsExpanded" Value="False">
+                                    <Setter TargetName="Branches" Property="Visibility"
+                                            Value="Collapsed" />
+                                </Trigger>
+                                <Trigger Property="HasItems" Value="False">
+                                    <Setter TargetName="Expander" Property="Visibility"
+                                            Value="Hidden" />
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Ligne" Property="Background"
+                                            Value="{DynamicResource Surface}" />
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="Ligne" Property="Background"
+                                            Value="{DynamicResource Surface}" />
+                                    <Setter TargetName="Ligne" Property="BorderBrush"
+                                            Value="{DynamicResource Rouge}" />
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource TexteVif}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <HierarchicalDataTemplate DataType="{x:Type k:NoeudArbre}"
+                                      ItemsSource="{Binding Enfants}">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,0">
+                    <Border Width="20" Height="20" Margin="0,0,9,0"
+                            VerticalAlignment="Center">
+                        <Image Source="{Binding Icone}" Stretch="Uniform"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
+                    </Border>
+                    <TextBlock Text="{Binding Libelle}" VerticalAlignment="Center"
+                               FontFamily="{DynamicResource Mono}" FontSize="11" />
+                    <TextBlock Text=" // " VerticalAlignment="Center"
+                               Foreground="{DynamicResource RougeEteint}"
+                               FontFamily="{DynamicResource Mono}" FontSize="11" />
+                    <TextBlock Text="{Binding Detail}" VerticalAlignment="Center"
+                               FontFamily="{DynamicResource Mono}" FontSize="11"
+                               TextTrimming="CharacterEllipsis" MaxWidth="130" />
+                </StackPanel>
+            </HierarchicalDataTemplate>
+
             <Style x:Key="CarteItem" TargetType="ListBoxItem">
                 <Setter Property="Margin" Value="0" />
                 <Setter Property="Padding" Value="0" />
@@ -424,8 +669,13 @@
             <!-- ===== Corps ===== -->
             <Grid Grid.Row="3">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="248" />
-                    <ColumnDefinition Width="*" />
+                    <!-- MinWidth des deux côtés : sans elles, la poignée
+                         laisse réduire un volet à zéro et il devient
+                         impossible de le rattraper à la souris. -->
+                    <ColumnDefinition x:Name="ColonneVolet" Width="248"
+                                      MinWidth="170" MaxWidth="560" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" MinWidth="320" />
                 </Grid.ColumnDefinitions>
 
                 <!-- Volet des nœuds -->
@@ -446,15 +696,19 @@
                             <Run Text="MONTÉS" />
                         </TextBlock>
 
-                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
-                                      HorizontalScrollBarVisibility="Disabled">
-                            <StackPanel x:Name="Noeuds" />
-                        </ScrollViewer>
+                        <TreeView x:Name="Arbre" Grid.Row="1"
+                                  Background="Transparent" BorderThickness="0"
+                                  Padding="6,0,0,8"
+                                  ItemContainerStyle="{StaticResource NoeudArbreItem}"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  VirtualizingPanel.IsVirtualizing="True" />
                     </Grid>
                 </Border>
 
+                <GridSplitter Grid.Column="1" Style="{StaticResource Separation}" />
+
                 <!-- Contenu -->
-                <Grid Grid.Column="1" Background="{DynamicResource Obsidienne}">
+                <Grid Grid.Column="2" Background="{DynamicResource Obsidienne}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
@@ -466,17 +720,28 @@
                             Padding="12,0">
                         <Grid>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Etiquette}" Text="IDENTIFIANT" />
-                                <TextBlock Style="{StaticResource Separateur}" />
-                                <TextBlock Style="{StaticResource Etiquette}"
-                                           Text="RESSOURCE SYSTÈME" />
+                                <TextBlock Style="{StaticResource Etiquette}" Text="TRIER"
+                                           Margin="0,0,0,4" />
+                                <TextBlock Style="{StaticResource Separateur}"
+                                           Margin="6,0,14,4" />
+                                <RadioButton x:Name="TriNom"    Style="{StaticResource BoutonTri}"
+                                             Content="NOM" IsChecked="True" />
+                                <RadioButton x:Name="TriTaille" Style="{StaticResource BoutonTri}"
+                                             Content="TAILLE" />
+                                <RadioButton x:Name="TriDate"   Style="{StaticResource BoutonTri}"
+                                             Content="DATE" />
+                                <RadioButton x:Name="TriType"   Style="{StaticResource BoutonTri}"
+                                             Content="TYPE" />
                             </StackPanel>
+
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
                                         VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource Etiquette}" Text="FORMAT"
-                                           Margin="0,0,28,0" />
-                                <TextBlock Style="{StaticResource Etiquette}" Text="STATUT"
-                                           Foreground="{DynamicResource Rouge}" />
+                                <TextBlock x:Name="Ordre" Style="{StaticResource Etiquette}"
+                                           Text="A → Z" Margin="0,0,12,0" />
+                                <Button x:Name="BtnSens" Style="{StaticResource BoutonNav}"
+                                        Width="26" Height="22" Margin="0"
+                                        Content="▲" FontSize="9"
+                                        ToolTip="Inverser le sens du tri" />
                             </StackPanel>
                         </Grid>
                     </Border>
