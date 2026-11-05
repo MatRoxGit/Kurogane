@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using Kurogane.Native;
 
 namespace Kurogane.Explorateur;
 
@@ -44,11 +45,38 @@ public sealed class SourceFichiers : ISourceNoeuds
         _                   => "lecteur",
     };
 
+    /// <summary>
+    /// Un dossier épinglé reprend l'icône de son dossier de profil quand
+    /// c'en est un — un « Téléchargements » épinglé ne doit pas avoir
+    /// l'air d'un dossier quelconque sous celui du profil.
+    /// </summary>
+    private static string IconeDossier(string chemin, string profil)
+    {
+        foreach (var (sous, _, icone) in DossiersConnus)
+        {
+            string connu = sous.Length == 0 ? profil : Path.Combine(profil, sous);
+
+            if (string.Equals(chemin.TrimEnd('\\'), connu.TrimEnd('\\'),
+                              StringComparison.OrdinalIgnoreCase))
+                return icone;
+        }
+
+        return TypesFichiers.Dossier;
+    }
+
     public IReadOnlyList<Racine> Racines()
     {
         var liste = new List<Racine>();
 
         string profil = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        // L'accès rapide de Windows, en tête comme dans l'Explorateur.
+        // On lit le sien plutôt que d'en tenir un à nous : « Épingler à
+        // l'accès rapide » du menu contextuel écrit dans cette liste-là,
+        // donc épingler depuis Kurogane marche sans code de plus.
+        foreach (var (nom, chemin) in AccesRapideNative.Lire())
+            liste.Add(new Racine("RAPIDE", nom.ToUpperInvariant(), chemin,
+                                 IconeDossier(chemin, profil)));
 
         foreach (var (sous, libelle, icone) in DossiersConnus)
         {
@@ -77,14 +105,15 @@ public sealed class SourceFichiers : ISourceNoeuds
         return liste;
     }
 
-    public async Task<Listage> Lister(string chemin, CancellationToken jeton)
+    public async Task<Listage> Lister(string chemin, Visibilite visibilite,
+                                      CancellationToken jeton)
     {
         var horloge = Stopwatch.StartNew();
 
         // Hors du fil d'interface : un dossier réseau lent y gèlerait la
         // fenêtre entière, et c'est exactement ce qu'on reproche à
         // l'Explorateur.
-        var resultat = await Task.Run(() => Parcourir(chemin, jeton), jeton)
+        var resultat = await Task.Run(() => Parcourir(chemin, visibilite, jeton), jeton)
                                  .ConfigureAwait(false);
 
         horloge.Stop();
@@ -92,7 +121,8 @@ public sealed class SourceFichiers : ISourceNoeuds
         return resultat with { Millisecondes = horloge.ElapsedMilliseconds };
     }
 
-    private static Listage Parcourir(string chemin, CancellationToken jeton)
+    private static Listage Parcourir(string chemin, Visibilite visibilite,
+                                     CancellationToken jeton)
     {
         var dossiers = new List<Entree>();
         var fichiers = new List<Entree>();
@@ -119,18 +149,18 @@ public sealed class SourceFichiers : ISourceNoeuds
                 var info = new FileInfo(entree);
                 bool estDossier = info.Attributes.HasFlag(FileAttributes.Directory);
 
-                // Les entrées système cachées encombrent sans servir —
-                // pagefile.sys, System Volume Information. Un réglage les
-                // rendra visibles plus tard ; pour l'instant on allège.
-                if (info.Attributes.HasFlag(FileAttributes.Hidden)
-                    && info.Attributes.HasFlag(FileAttributes.System)) continue;
+                bool cachee  = info.Attributes.HasFlag(FileAttributes.Hidden);
+                bool systeme = info.Attributes.HasFlag(FileAttributes.System);
+
+                if (visibilite.Ecarter(cachee, systeme)) continue;
 
                 var e = new Entree(
                     Path.GetFileName(entree),
                     entree,
                     estDossier,
                     estDossier ? 0 : info.Length,
-                    info.LastWriteTime);
+                    info.LastWriteTime,
+                    cachee || systeme);
 
                 if (estDossier) dossiers.Add(e); else fichiers.Add(e);
             }
@@ -151,7 +181,8 @@ public sealed class SourceFichiers : ISourceNoeuds
         return new Listage(dossiers, erreurs, 0);
     }
 
-    public async Task<IReadOnlyList<Entree>> Dossiers(string chemin, CancellationToken jeton)
+    public async Task<IReadOnlyList<Entree>> Dossiers(string chemin, Visibilite visibilite,
+                                                      CancellationToken jeton)
     {
         return await Task.Run(IReadOnlyList<Entree> () =>
         {
@@ -167,11 +198,13 @@ public sealed class SourceFichiers : ISourceNoeuds
                     {
                         var info = new DirectoryInfo(sous);
 
-                        if (info.Attributes.HasFlag(FileAttributes.Hidden)
-                            && info.Attributes.HasFlag(FileAttributes.System)) continue;
+                        bool cachee  = info.Attributes.HasFlag(FileAttributes.Hidden);
+                        bool systeme = info.Attributes.HasFlag(FileAttributes.System);
+
+                        if (visibilite.Ecarter(cachee, systeme)) continue;
 
                         liste.Add(new Entree(info.Name, info.FullName, true, 0,
-                            info.LastWriteTime));
+                            info.LastWriteTime, cachee || systeme));
                     }
                     catch (Exception)
                     {
@@ -198,9 +231,9 @@ public sealed class SourceFichiers : ISourceNoeuds
         catch { return null; }
     }
 
-    public IReadOnlyList<string> Segments(string chemin)
+    public IReadOnlyList<(string Libelle, string Chemin)> Segments(string chemin)
     {
-        var pile = new List<string>();
+        var pile = new List<(string, string)>();
 
         try
         {
@@ -210,16 +243,18 @@ public sealed class SourceFichiers : ISourceNoeuds
             {
                 // Le nom d'une racine est « C:\ » : on le réduit à « VOL_C: »
                 // pour rester dans le vocabulaire de la maquette.
-                pile.Insert(0, courant.Parent is null
+                string libelle = courant.Parent is null
                     ? "VOL_" + courant.Name.TrimEnd('\\', '/')
-                    : courant.Name);
+                    : courant.Name;
+
+                pile.Insert(0, (libelle, courant.FullName));
 
                 courant = courant.Parent;
             }
         }
         catch
         {
-            return new[] { chemin };
+            return new[] { (chemin, chemin) };
         }
 
         return pile;

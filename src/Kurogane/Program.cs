@@ -8,7 +8,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.43.0";
+    private const string Version = "0.54.0";
 
     private static readonly IThemeModule[] Modules =
     {
@@ -53,6 +53,7 @@ internal static class Program
                 "contraste" => CmdContraste(args),
                 "probe-explorateur" => CmdProbeExplorateur(args),
                 "probe-pack" => CmdProbePack(args),
+                "probe-bureau" => CmdProbeBureau(args),
                 // Relais appele par le shell pendant l'essai d'ouverture.
                 // Sans journal : il doit etre invisible et rapide.
                 "preuve-ouverture" => ExplorateurProbe.Preuve(
@@ -580,6 +581,12 @@ internal static class Program
         return PackProbe.Executer(journal, ThemeDefinition.Load(chemin));
     }
 
+    private static int CmdProbeBureau(string[] args)
+    {
+        using var journal = new Journal("probe-bureau");
+        return Probe.BureauProbe.Executer(journal, args.Contains("--essai"));
+    }
+
     /// <summary>
     /// Premier argument qui n'est ni une option, ni la valeur d'une option.
     /// </summary>
@@ -1005,6 +1012,14 @@ internal static class Program
                   noms demandés sans fichier, et les fichiers que rien ne
                   lit — c'est ce second cas qui est passé inaperçu deux jours
                   durant. Lecture seule.
+
+              probe-bureau [--essai]
+                  Relève la pile de fenêtres du bureau — Progman, WorkerW,
+                  SHELLDLL_DefView, SysListView32 — et où la vue des icônes
+                  se trouve réellement sur cette machine. Avec --essai, la
+                  masque trois secondes puis la rétablit, pour savoir si une
+                  couche Kurogane pourrait occuper le bureau. Rien n'est
+                  écrit : ShowWindow ne laisse pas de trace.
 
               probe-explorateur [--essai | --ouverture [--commit]]
                   Relève qui ouvre un dossier aujourd'hui, où c'est écrit, et

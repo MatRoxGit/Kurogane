@@ -223,6 +223,20 @@ public sealed class ExplorateurSection
     /// existent ; le défaut suit celui de Windows.
     /// </summary>
     public bool? OuvertureSimpleClic { get; set; }
+
+    /// <summary>
+    /// Montrer les entrées portant l'attribut Caché. Vrai par défaut : les
+    /// bascules de la barre retranchent, elles n'ajoutent pas.
+    /// </summary>
+    public bool? AfficherCaches { get; set; }
+
+    /// <summary>
+    /// Montrer les entrées portant l'attribut Système — la quasi-totalité
+    /// de System32, mais aussi <c>pagefile.sys</c> et
+    /// <c>System Volume Information</c>. Vrai par défaut, pour la même
+    /// raison.
+    /// </summary>
+    public bool? AfficherSysteme { get; set; }
 }
 
 public sealed class StartMenuSection

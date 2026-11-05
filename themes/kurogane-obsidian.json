@@ -73,7 +73,9 @@
     ]
   },
   "explorateur": {
-    "ouvertureSimpleClic": false
+    "ouvertureSimpleClic": false,
+    "afficherCaches": true,
+    "afficherSysteme": true
   },
   "contraste": {
     "fond": "#080506",

@@ -551,9 +551,140 @@ Découvert sur un cadre blanc autour du champ de filtre. Six contrôles ont dû
 être regabarités depuis : `TextBox`, `TreeViewItem`, `ToggleButton`,
 `ScrollBar`, `RadioButton`, `GridSplitter`.
 
+### Nommer, renommer
+
+Créer un dossier ouvre directement la saisie de son nom, et `F2` la rouvre
+sur n'importe quelle entrée : un dossier appelé « Nouveau dossier » n'est
+utile à personne. Le nom est sélectionné sans son extension, comme le fait
+l'Explorateur — renommer `rapport.pdf` porte presque toujours sur
+`rapport`.
+
+Un défaut repéré à la relecture, pas à l'exécution : le gestionnaire de
+clavier est branché sur `PreviewKeyDown` de la liste, et cet événement
+descend du parent vers l'enfant. Pendant une saisie, il voyait donc les
+touches avant le champ : `Suppr` aurait supprimé le fichier qu'on était en
+train de renommer, et `Entrée` l'aurait ouvert. Le champ est désormais seul
+maître des touches tant qu'une édition est ouverte. La surveillance du
+dossier se tait pour la même raison : relire aurait reconstruit les cartes
+et effacé la frappe en cours.
+
+### Ne rien perdre du menu de Windows
+
+Notre menu couvre les actions courantes. Il ne peut pas couvrir toutes
+celles de Windows, et c'est structurel : « Envoyer vers », « Compresser »,
+« Ouvrir dans le Terminal », et surtout tout ce que les logiciels installés
+ajoutent — 7-Zip, Git, un antivirus. Aucun inventaire écrit à l'avance ne
+connaîtra ce qui n'est pas encore installé sur la machine.
+
+La seule façon de ne rien perdre est de demander au shell le menu qu'il
+aurait construit lui-même. L'entrée « AFFICHER PLUS D'OPTIONS » est en bas
+du menu, aussi accessible par `Maj+F10`.
+
+**Demander le menu ne veut pas dire le laisser dessiner.** La première
+version laissait Windows afficher le sien : toutes les entrées y étaient,
+mais le menu tranchait au milieu d'une fenêtre qui porte le thème. On lit
+maintenant sa structure — libellés, raccourcis, séparateurs, états,
+sous-menus — et l'explorateur la redessine avec ses propres gabarits. Seule
+l'exécution retourne au shell, qui seul sait ce que fait chaque verbe.
+
+La mise en œuvre passe par `IShellItemArray.BindToHandler` puis
+`IContextMenu`, et la lecture par `GetMenuItemInfo` / `GetMenuString` —
+sans paquet NuGet, comme le reste. Un détail décide du résultat : un
+sous-menu est vide tant que le shell n'a pas reçu `WM_INITMENUPOPUP`, car
+il ne le garnit qu'au moment où il croit que Windows va le déplier. On le
+lui envoie nous-mêmes, par `IContextMenu3`, à l'ouverture du sous-menu.
+
+L'objet COM et le menu natif restent en vie tant que le menu est
+affiché : l'identifiant d'une commande n'a de sens que pour l'instance qui
+l'a produit.
+
+### L'accès rapide, celui de Windows
+
+Le volet affiche les dossiers épinglés, dans leur propre section au-dessus
+des nœuds système — une liste que l'utilisateur tient lui-même ne se
+présente pas au même plan que ce que la machine impose.
+
+C'est l'accès rapide de Windows qui est lu, pas une liste à nous. La raison
+est pratique : « Épingler à l'accès rapide », que le menu contextuel expose
+désormais, écrit dans cette liste-là. Épingler depuis Kurogane fonctionne
+donc sans une ligne de plus, et les épingles existantes sont déjà là.
+
+L'accès rapide n'étant pas un dossier du disque mais un nœud de l'espace de
+noms, il passe par le shell : `SHCreateItemFromParsingName` puis
+`IEnumShellItems`. C'est le premier morceau de la bascule que
+`ISourceNoeuds` prévoyait pour « Ce PC » et « Réseau ».
+
+**Un filtre nécessaire** : ce nœud mêle les épingles de l'utilisateur aux
+dossiers que Windows a jugés fréquents et ajoutés de lui-même — un
+« Nouveau dossier » créé la veille s'y invite. Seule la propriété
+`System.IsPinnedToNameSpaceTree` les distingue, lue par `IShellItem2`. Si
+elle ne répond pas, tout est montré : afficher un dossier de trop vaut
+mieux que perdre une épingle.
+
+### Chercher
+
+Le champ filtre la liste déjà chargée à chaque frappe. **Entrée** reprend le
+même motif et part chercher récursivement depuis le dossier affiché ;
+**Échap** revient au dossier, en gardant le motif.
+
+Les résultats s'affichent au fil du parcours. Chercher dans `C:\Windows`
+prend des dizaines de secondes : attendre la fin reviendrait à ne rien
+afficher. Le découpage se fait au temps — 120 ms — et non au nombre de
+dossiers, parce qu'un dossier de quatre entrées et un de quatre mille ne
+coûtent pas la même chose. Arrêt à 5000 résultats, signalé dans la barre
+d'état.
+
+Les règles du motif vivent dans un seul fichier, `Filtrage.cs` : pendant une
+recherche, continuer à taper restreint ce qui remonte, et deux
+implémentations qui divergeraient feraient disparaître des résultats sans
+rien dire.
+
+**Deux corrections venues de l'usage.** L'extension se compare par début et
+non en entier : on tape caractère par caractère, et exiger l'extension
+complète affichait zéro résultat sur `*.d` et `*.dl` avant de tout faire
+apparaître sur `*.dll`. Un filtre muet tant qu'il n'est pas fini n'aide pas
+à chercher.
+
+Et la correspondance est **soulignée dans le nom**. Un filtre sur `me` qui
+retient `aadWamExtension.dll` a raison — `aadWa`**`mE`**`xtension` — mais le
+nom est tronqué sur la carte et le résultat a l'air arbitraire. Quand la
+correspondance tombe trop loin, le début du nom est sacrifié pour la ramener
+dans le cadre : c'est la fin que WPF tronque.
+
+### Cachés et système
+
+Deux bascules dans la barre de tri, **indépendantes** : `CACHÉS` retranche
+les entrées portant l'attribut Caché, `SYSTÈME` celles portant l'attribut
+Système. Une entrée qui porte les deux demande les deux. `Ctrl+H` bascule
+la première.
+
+Les deux sont actives par défaut : les bascules retranchent, elles
+n'ajoutent pas. Partir de la vue complète évite qu'un dossier paraisse vide
+sans qu'on sache pourquoi. Le thème donne le point de départ
+(`afficherCaches`, `afficherSysteme`) ; la bascule n'y réécrit rien.
+
+**Une première version avait un trou**, et c'est l'usage qui l'a montré :
+elle copiait Windows — « cachées » d'un côté, « cachées ET système » de
+l'autre. Un dossier marqué Système sans être Caché, ce qu'est à peu près
+tout `System32`, n'était alors filtré par aucune des deux. Les boutons ne
+changeaient rien de visible, ce qui est pire qu'une absence de réglage.
+
+La règle actuelle s'écarte donc de l'Explorateur, qui montre toujours les
+fichiers système non cachés. Elle a pour elle de faire exactement ce que
+ses étiquettes annoncent.
+
+Une entrée retranchable s'affiche **en retrait** quand elle est montrée.
+La montrer sans la distinguer la ferait passer pour un fichier ordinaire,
+ce qui est pire que de la masquer.
+
+Le filtre de la recherche récursive applique la même règle, à la main et
+non par `AttributesToSkip` : cette option écarte dès qu'*un* attribut
+correspond, et les deux chemins divergeraient.
+
 ### Ce qui manque
 
-Clic droit, actions sur les fichiers, recherche récursive.
+Ouverture dans un nouvel onglet, et le tri qui ne calcule pas le poids des
+dossiers.
 
 Une nuance à poser avant d'y toucher, parce qu'elle décide du comportement :
 **« rien d'irréversible » encadre ce que Kurogane décide, pas ce que
@@ -572,9 +703,36 @@ Le **mode de rangement automatique** du cahier des charges en relèvera plus
 encore : là, Kurogane décidera fichier par fichier sans validation
 individuelle, et chaque déplacement devra être journalisé et défaisable.
 
+## Le bureau — sondé, pas encore écrit
+
+Le menu contextuel du bureau est celui de Windows, et le rester tant qu'on
+ne possède pas le bureau. Il appartient à une `SysListView32` logée dans un
+`SHELLDLL_DefView`, lui-même enfant d'une fenêtre d'`explorer.exe`. Le
+thématiser demanderait de se greffer dans ce processus — exclu.
+
+La voie compatible est d'occuper le bureau : une couche Kurogane qui dessine
+les icônes depuis le dossier Bureau, et la vue de Windows mise en sommeil.
+Trois points décidaient si elle est ouverte. `probe-bureau --essai` les a
+tranchés sur une machine Windows 11 22621 :
+
+| | Relevé |
+| --- | --- |
+| Où vit la vue | `SHELLDLL_DefView` sous `Progman`, parmi 18 racines dont 17 `WorkerW` |
+| Masquage | prend, et tient au-delà de trois secondes |
+| Retour | la vue revient intacte |
+
+**La couche est donc possible.** `ShowWindow` n'écrit rien et se défait
+seul : rien d'irréversible n'est en jeu.
+
+Une limite que la sonde établit au passage : le *nombre* d'icônes se lit
+sans rien injecter — `LVM_GETITEMCOUNT` ne transporte aucun pointeur — mais
+leur *texte* non, car il en faudrait un, et donc de la mémoire partagée dans
+le processus du shell. Les icônes de la couche viendront du dossier Bureau,
+pas de cette liste.
+
 ## État
 
-v0.42.0 — mode sombre, accent, fond d'écran, 15 icônes réparties sur trois
+v0.54.0 — mode sombre, accent, fond d'écran, 15 icônes réparties sur trois
 mécanismes (registre utilisateur, registre machine, `desktop.ini`), barre des
 tâches et menu Démarrer.
 
@@ -582,7 +740,9 @@ En commandes séparées : la substitution de ressources dans
 `imageres.dll.mun` pour les cinq entrées de l'Accès rapide, la barre des
 tâches de remplacement, l'habillage des fenêtres par attributs DWM, le thème
 de contraste qui atteint l'intérieur de l'Explorateur, et l'explorateur
-Kurogane en lecture seule.
+Kurogane — navigation, arborescence, filtrage, copier-couper-coller,
+corbeille et suppression définitive, création et renommage en place, et le
+menu complet du shell redessiné au thème.
 
 Le pack compte 71 icônes, en noms français, vérifiables par `probe-pack` :
 elle confronte le dossier à ce que le thème, la barre et la table des types

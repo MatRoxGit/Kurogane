@@ -204,9 +204,157 @@
                 </Setter>
             </Style>
 
+            <!-- Menu contextuel. ContextMenu, MenuItem et Separator sont
+                 trois contrôles standards de plus : sans gabarit, le thème
+                 de contraste les redessine à sa façon. -->
+            <Style x:Key="SeparateurMenu" TargetType="Separator">
+                <Setter Property="Height" Value="1" />
+                <Setter Property="Margin" Value="10,5" />
+                <Setter Property="Background" Value="{DynamicResource Soudure}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Separator">
+                            <Rectangle Height="1"
+                                       Fill="{DynamicResource Soudure}" />
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="EntreeMenu" TargetType="MenuItem">
+                <Setter Property="Height" Value="30" />
+                <Setter Property="Foreground" Value="{DynamicResource TexteVif}" />
+                <Setter Property="FontFamily" Value="{DynamicResource Mono}" />
+                <Setter Property="FontSize" Value="10.5" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="MenuItem">
+                            <Border x:Name="Fond" Background="Transparent"
+                                    BorderBrush="Transparent"
+                                    BorderThickness="2,0,0,0" Padding="12,0,16,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <ContentPresenter Grid.Column="0"
+                                                      ContentSource="Header"
+                                                      VerticalAlignment="Center" />
+
+                                    <TextBlock Grid.Column="1" Margin="28,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Text="{TemplateBinding InputGestureText}"
+                                               Foreground="{DynamicResource TexteEteint}"
+                                               FontFamily="{DynamicResource Mono}"
+                                               FontSize="9.5" />
+
+                                    <!-- Chevron des sous-menus : masqué tant
+                                         que l'entrée n'a pas d'enfants. -->
+                                    <TextBlock x:Name="Chevron" Grid.Column="2"
+                                               Margin="20,0,0,0" Text="›"
+                                               VerticalAlignment="Center"
+                                               Visibility="Collapsed"
+                                               Foreground="{DynamicResource Rouge}"
+                                               FontFamily="{DynamicResource Mono}"
+                                               FontSize="13" />
+
+                                    <!-- Le sous-menu se dessine ici, avec le
+                                         même habillage que le menu parent :
+                                         un ContextMenu ne prête pas son
+                                         gabarit à ses descendants. -->
+                                    <Popup x:Name="PART_Popup" Placement="Right"
+                                           HorizontalOffset="-6" VerticalOffset="-8"
+                                           AllowsTransparency="True" Focusable="False"
+                                           PopupAnimation="None"
+                                           IsOpen="{Binding IsSubmenuOpen,
+                                                    RelativeSource={RelativeSource TemplatedParent}}">
+                                        <Border Background="{DynamicResource Creux}"
+                                                BorderBrush="{DynamicResource Soudure}"
+                                                BorderThickness="1" Padding="0,6"
+                                                MinWidth="200">
+                                            <StackPanel IsItemsHost="True"
+                                                        KeyboardNavigation.DirectionalNavigation="Cycle" />
+                                        </Border>
+                                    </Popup>
+                                </Grid>
+                            </Border>
+
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="HasItems" Value="True">
+                                    <Setter TargetName="Chevron"
+                                            Property="Visibility" Value="Visible" />
+                                </Trigger>
+                                <Trigger Property="IsHighlighted" Value="True">
+                                    <Setter TargetName="Fond" Property="Background"
+                                            Value="{DynamicResource Surface}" />
+                                    <Setter TargetName="Fond" Property="BorderBrush"
+                                            Value="{DynamicResource Rouge}" />
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Foreground"
+                                            Value="{DynamicResource RougeEteint}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="MenuKurogane" TargetType="ContextMenu">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ContextMenu">
+                            <Border Background="{DynamicResource Obsidienne}"
+                                    BorderBrush="{DynamicResource Rouge}"
+                                    BorderThickness="1"
+                                    Padding="0,6">
+                                <StackPanel IsItemsHost="True" />
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <!-- Bouton de tri. RadioButton pour l'exclusivité mutuelle,
                  mais entièrement regabarité : le rond système reviendrait
                  habillé par le thème de contraste, comme tout le reste. -->
+            <!-- Même dessin que les critères de tri, mais à deux états :
+                 une bascule n'appartient pas à un groupe. -->
+            <Style x:Key="BoutonBascule" TargetType="ToggleButton">
+                <Setter Property="Margin" Value="18,0,0,0" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <StackPanel Background="Transparent">
+                                <TextBlock x:Name="Libelle"
+                                           Text="{TemplateBinding Content}"
+                                           Foreground="{DynamicResource TexteEteint}"
+                                           FontFamily="{DynamicResource Mono}"
+                                           FontSize="10" />
+                                <Rectangle x:Name="Trait" Height="1.5" Margin="0,3,0,0"
+                                           Fill="Transparent" />
+                            </StackPanel>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Libelle" Property="Foreground"
+                                            Value="{DynamicResource TexteVif}" />
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="Libelle" Property="Foreground"
+                                            Value="{DynamicResource TexteVif}" />
+                                    <Setter TargetName="Trait" Property="Fill"
+                                            Value="{DynamicResource Ambre}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
             <Style x:Key="BoutonTri" TargetType="RadioButton">
                 <Setter Property="Margin" Value="0,0,18,0" />
                 <Setter Property="Cursor" Value="Hand" />
@@ -476,11 +624,24 @@
                                                RenderOptions.BitmapScalingMode="HighQuality" />
                                     </Border>
                                     <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Nom}" MaxWidth="150"
-                                                   Foreground="{DynamicResource TexteVif}"
-                                                   FontFamily="{DynamicResource Mono}"
-                                                   FontSize="11" FontWeight="Bold"
-                                                   TextTrimming="CharacterEllipsis" />
+                                        <Grid>
+                                            <TextBlock x:Name="Etiquette"
+                                                       MaxWidth="150"
+                                                       k:Surlignage.Source="{Binding Nom}"
+                                                       k:Surlignage.Motif="{Binding Motif,
+                                                           RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                       Foreground="{DynamicResource TexteVif}"
+                                                       FontFamily="{DynamicResource Mono}"
+                                                       FontSize="11" FontWeight="Bold"
+                                                       TextTrimming="CharacterEllipsis" />
+
+                                            <TextBox x:Name="Edition" Width="150"
+                                                     Visibility="Collapsed"
+                                                     Style="{StaticResource ChampNu}"
+                                                     FontWeight="Bold"
+                                                     Text="{Binding Saisie,
+                                                            UpdateSourceTrigger=PropertyChanged}" />
+                                        </Grid>
                                         <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                                             <TextBlock Text="{Binding Meta}"
                                                        Foreground="{DynamicResource TexteEteint}"
@@ -500,6 +661,19 @@
                             </b:Biseau>
 
                             <ControlTemplate.Triggers>
+                                <DataTrigger Value="True" Binding="{Binding Attenue}">
+                                    <Setter TargetName="Coque" Property="Opacity"
+                                            Value="0.5" />
+                                </DataTrigger>
+                                <DataTrigger Value="True"
+                                             Binding="{Binding EnEdition}">
+                                    <Setter TargetName="Etiquette" Property="Visibility"
+                                            Value="Collapsed" />
+                                    <Setter TargetName="Edition" Property="Visibility"
+                                            Value="Visible" />
+                                    <Setter TargetName="Coque" Property="BorderBrush"
+                                            Value="{DynamicResource Ambre}" />
+                                </DataTrigger>
                                 <Trigger Property="IsMouseOver" Value="True">
                                     <Setter TargetName="Coque" Property="BorderBrush"
                                             Value="{DynamicResource RougeEteint}" />
@@ -601,6 +775,8 @@
                     <Button x:Name="BtnPrecedent" Style="{StaticResource BoutonNav}" Content="‹" />
                     <Button x:Name="BtnSuivant"   Style="{StaticResource BoutonNav}" Content="›" />
                     <Button x:Name="BtnParent"    Style="{StaticResource BoutonNav}" Content="↑" />
+                    <Button x:Name="BtnActualiser" Style="{StaticResource BoutonNav}"
+                            Content="⟳" Margin="8,0,0,0" ToolTip="Actualiser (F5)" />
                 </StackPanel>
 
                 <Border Grid.Column="1" Height="28" VerticalAlignment="Center"
@@ -636,6 +812,8 @@
                                 <Run Text="FILTRER" Foreground="#FF8C6268" />
                                 <Run Text=" // " Foreground="#FF3A1016" />
                                 <Run Text="NOM OU *.EXT" Foreground="#FF8C6268" />
+                                <Run Text=" // " Foreground="#FF3A1016" />
+                                <Run Text="ENTRÉE : RÉCURSIF" Foreground="#FF5A3038" />
                             </TextBlock>
 
                             <TextBox x:Name="Filtre" Style="{StaticResource ChampNu}"
@@ -685,18 +863,42 @@
                          reçoit une hauteur infinie et ne défile jamais. -->
                     <Grid>
                         <Grid.RowDefinitions>
+                            <!-- L'accès rapide occupe la place qu'il
+                                 demande, les nœuds système le reste. Une
+                                 liste que l'utilisateur tient lui-même ne
+                                 se présente pas au même plan que ce que la
+                                 machine impose. -->
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <TextBlock Grid.Row="0" Margin="18,16,0,10"
+                        <TextBlock x:Name="TitreRapide" Grid.Row="0"
+                                   Margin="18,16,0,10"
+                                   Style="{StaticResource Etiquette}">
+                            <Run Text="ACCÈS RAPIDE" />
+                            <Run Text=" // " Foreground="{DynamicResource Rouge}" />
+                            <Run Text="ÉPINGLÉS" />
+                        </TextBlock>
+
+                        <TreeView x:Name="ArbreRapide" Grid.Row="1"
+                                  MaxHeight="260"
+                                  Background="Transparent" BorderThickness="0"
+                                  Padding="6,0,0,0"
+                                  ItemContainerStyle="{StaticResource NoeudArbreItem}"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                  VirtualizingPanel.IsVirtualizing="True" />
+
+                        <TextBlock x:Name="TitreSysteme" Grid.Row="2"
+                                   Margin="18,18,0,10"
                                    Style="{StaticResource Etiquette}">
                             <Run Text="NOEUDS SYSTÈME" />
                             <Run Text=" // " Foreground="{DynamicResource Rouge}" />
                             <Run Text="MONTÉS" />
                         </TextBlock>
 
-                        <TreeView x:Name="Arbre" Grid.Row="1"
+                        <TreeView x:Name="Arbre" Grid.Row="3"
                                   Background="Transparent" BorderThickness="0"
                                   Padding="6,0,0,8"
                                   ItemContainerStyle="{StaticResource NoeudArbreItem}"
@@ -732,6 +934,18 @@
                                              Content="DATE" />
                                 <RadioButton x:Name="TriType"   Style="{StaticResource BoutonTri}"
                                              Content="TYPE" />
+
+                                <TextBlock Style="{StaticResource Separateur}"
+                                           Margin="4,0,0,0" />
+
+                                <ToggleButton x:Name="VoirCaches"
+                                              Style="{StaticResource BoutonBascule}"
+                                              Content="CACHÉS"
+                                              ToolTip="Entrées cachées (Ctrl+H)" />
+                                <ToggleButton x:Name="VoirSysteme"
+                                              Style="{StaticResource BoutonBascule}"
+                                              Content="SYSTÈME"
+                                              ToolTip="Entrées cachées et système — pagefile.sys, System Volume Information" />
                             </StackPanel>
 
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
@@ -746,7 +960,8 @@
                         </Grid>
                     </Border>
 
-                    <ListBox x:Name="Cartes" Grid.Row="1"
+                    <Grid Grid.Row="1">
+                    <ListBox x:Name="Cartes"
                              Background="Transparent" BorderThickness="0"
                              Foreground="{DynamicResource TexteVif}"
                              SelectionMode="Extended"
@@ -754,6 +969,46 @@
                              VirtualizingPanel.IsVirtualizing="True"
                              ScrollViewer.CanContentScroll="True"
                              KeyboardNavigation.DirectionalNavigation="Contained">
+                        <ListBox.ContextMenu>
+                            <ContextMenu x:Name="Menu" Style="{StaticResource MenuKurogane}">
+                                <MenuItem x:Name="MenuOuvrir" Style="{StaticResource EntreeMenu}"
+                                          Header="OUVRIR" InputGestureText="Entrée" />
+                                <MenuItem x:Name="MenuOuvrirAvec" Style="{StaticResource EntreeMenu}"
+                                          Header="OUVRIR AVEC…" />
+                                <Separator Style="{StaticResource SeparateurMenu}" />
+                                <MenuItem x:Name="MenuCouper" Style="{StaticResource EntreeMenu}"
+                                          Header="COUPER" InputGestureText="Ctrl+X" />
+                                <MenuItem x:Name="MenuCopier" Style="{StaticResource EntreeMenu}"
+                                          Header="COPIER" InputGestureText="Ctrl+C" />
+                                <MenuItem x:Name="MenuColler" Style="{StaticResource EntreeMenu}"
+                                          Header="COLLER" InputGestureText="Ctrl+V" />
+                                <MenuItem x:Name="MenuChemin" Style="{StaticResource EntreeMenu}"
+                                          Header="COPIER LE CHEMIN" InputGestureText="Ctrl+Maj+C" />
+                                <Separator Style="{StaticResource SeparateurMenu}" />
+                                <MenuItem x:Name="MenuRenommer"
+                                          Style="{StaticResource EntreeMenu}"
+                                          Header="RENOMMER" InputGestureText="F2" />
+                                <MenuItem x:Name="MenuNouveauDossier"
+                                          Style="{StaticResource EntreeMenu}"
+                                          Header="NOUVEAU DOSSIER"
+                                          InputGestureText="Ctrl+Maj+N" />
+                                <Separator Style="{StaticResource SeparateurMenu}" />
+                                <MenuItem x:Name="MenuSupprimer" Style="{StaticResource EntreeMenu}"
+                                          Header="METTRE À LA CORBEILLE" InputGestureText="Suppr" />
+                                <MenuItem x:Name="MenuEffacer" Style="{StaticResource EntreeMenu}"
+                                          Header="SUPPRIMER DÉFINITIVEMENT"
+                                          InputGestureText="Maj+Suppr" />
+                                <Separator Style="{StaticResource SeparateurMenu}" />
+                                <MenuItem x:Name="MenuProprietes" Style="{StaticResource EntreeMenu}"
+                                          Header="PROPRIÉTÉS" InputGestureText="Alt+Entrée" />
+                                <Separator Style="{StaticResource SeparateurMenu}" />
+                                <MenuItem x:Name="MenuPlusOptions"
+                                          Style="{StaticResource EntreeMenu}"
+                                          Header="AFFICHER PLUS D'OPTIONS"
+                                          InputGestureText="Maj+F10" />
+                            </ContextMenu>
+                        </ListBox.ContextMenu>
+
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <k:PanneauCartes LargeurCarte="246" HauteurCarte="72" />
@@ -771,6 +1026,17 @@
                             </ControlTemplate>
                         </ListBox.Template>
                     </ListBox>
+
+                    <!-- Couche de dessin du lasso, au-dessus de la liste et
+                         transparente aux clics : elle montre, elle
+                         n'intercepte pas. -->
+                    <Canvas x:Name="Calque" IsHitTestVisible="False">
+                        <Rectangle x:Name="Bande" Visibility="Collapsed"
+                                   Fill="{DynamicResource RougeVoile}"
+                                   Stroke="{DynamicResource Rouge}"
+                                   StrokeThickness="1" />
+                    </Canvas>
+                    </Grid>
                 </Grid>
             </Grid>
 

@@ -186,6 +186,46 @@ public sealed class PanneauCartes : VirtualizingPanel, IScrollInfo
         return finale;
     }
 
+    /// <summary>
+    /// Les indices dont la cellule croise la zone donnée, exprimée dans les
+    /// coordonnées du panneau.
+    ///
+    /// Le calcul est arithmétique et non visuel, et c'est nécessaire : avec
+    /// la virtualisation, les cartes hors écran n'existent pas comme
+    /// contrôles. Un test d'intersection sur l'arbre visuel ne trouverait
+    /// que ce qui est déjà affiché, et un lasso tiré en faisant défiler
+    /// manquerait tout le reste.
+    /// </summary>
+    internal IReadOnlyList<int> IndicesDans(Rect zone)
+    {
+        var proprietaire = ItemsControl.GetItemsOwner(this);
+        int total = proprietaire?.Items.Count ?? 0;
+
+        if (total == 0) return Array.Empty<int>();
+
+        // La zone est relative au panneau, donc déjà décalée du défilement.
+        // On repasse en coordonnées de contenu pour retrouver les lignes.
+        double haut = zone.Top    + _decalage.Y;
+        double bas  = zone.Bottom + _decalage.Y;
+
+        int ligneHaut = Math.Max(0, (int)(haut / HauteurCarte));
+        int ligneBas  = (int)(bas / HauteurCarte);
+
+        int colGauche = Math.Max(0, (int)(zone.Left  / LargeurCarte));
+        int colDroite = Math.Min(_colonnes - 1, (int)(zone.Right / LargeurCarte));
+
+        var indices = new List<int>();
+
+        for (int ligne = ligneHaut; ligne <= ligneBas; ligne++)
+            for (int colonne = colGauche; colonne <= colDroite; colonne++)
+            {
+                int index = ligne * _colonnes + colonne;
+                if (index >= 0 && index < total) indices.Add(index);
+            }
+
+        return indices;
+    }
+
     // ---------------------------------------------------------- IScrollInfo
 
     public bool CanVerticallyScroll { get; set; } = true;
