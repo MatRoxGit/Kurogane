@@ -32,8 +32,12 @@
                  contraste, celui de WPF redessinerait la sélection avec
                  les couleurs système. -->
             <Style x:Key="IconeBureau" TargetType="ListBoxItem">
-                <Setter Property="Margin" Value="6,4" />
                 <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+
+                <!-- La place vient de la donnée, pas du panneau : c'est
+                     l'utilisateur qui range son bureau. -->
+                <Setter Property="Canvas.Left" Value="{Binding X}" />
+                <Setter Property="Canvas.Top" Value="{Binding Y}" />
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="ListBoxItem">
@@ -109,14 +113,15 @@
              clavier. La sélection se voit déjà sur les icônes. -->
         <ListBox x:Name="Grille" FocusVisualStyle="{x:Null}"
                  Background="Transparent" BorderThickness="0"
-                 HorizontalAlignment="Left" VerticalAlignment="Stretch"
-                 Margin="56,56,0,56" SelectionMode="Extended"
+                 Margin="40,40,40,30" SelectionMode="Extended"
                  ItemContainerStyle="{StaticResource IconeBureau}"
                  ScrollViewer.VerticalScrollBarVisibility="Disabled"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <!-- Canvas et non WrapPanel : un panneau qui range tout seul
+                 ne peut pas obéir à une position posée à la main. -->
             <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Vertical" />
+                    <Canvas Background="Transparent" />
                 </ItemsPanelTemplate>
             </ListBox.ItemsPanel>
         </ListBox>

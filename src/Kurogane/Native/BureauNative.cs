@@ -145,6 +145,71 @@ internal static class BureauNative
     internal static bool Eveillee(IntPtr vue) =>
         vue != IntPtr.Zero && WindowNative.IsWindowVisible(vue);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool ChangeWindowMessageFilterEx(
+        IntPtr fenetre, uint message, uint action, IntPtr info);
+
+    private const uint Autoriser = 1;          // MSGFLT_ALLOW
+    private const uint WM_DROPFILES = 0x0233;
+    private const uint WM_COPYDATA = 0x004A;
+    private const uint WM_COPYGLOBALDATA = 0x0049;
+
+    /// <summary>
+    /// Laisse passer le glisser-déposer venu d'un processus moins
+    /// privilégié.
+    ///
+    /// Windows isole les privilèges d'interface : un processus en
+    /// intégrité moyenne — l'Explorateur, par exemple — ne peut pas
+    /// déposer sur la fenêtre d'un processus élevé. Les messages sont
+    /// filtrés avant d'arriver, et la fenêtre ne voit rien : pas d'erreur,
+    /// pas de refus visible, juste un dépôt qui n'arrive jamais.
+    ///
+    /// Lancer Kurogane sans élévation est la vraie réponse — la couche
+    /// bureau n'a besoin d'aucun droit particulier. Ce filtre n'est qu'un
+    /// filet pour le cas où elle le serait quand même.
+    /// </summary>
+    internal static void AutoriserDepots(IntPtr fenetre)
+    {
+        if (fenetre == IntPtr.Zero) return;
+
+        foreach (uint message in new[] { WM_DROPFILES, WM_COPYDATA, WM_COPYGLOBALDATA })
+            ChangeWindowMessageFilterEx(fenetre, message, Autoriser, IntPtr.Zero);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT { public int X, Y; }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr WindowFromPoint(POINT point);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr fenetre, uint type);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out POINT point);
+
+    private const uint Racine = 2;   // GA_ROOT
+
+    /// <summary>
+    /// La fenêtre de premier niveau sous le curseur.
+    ///
+    /// La couche couvre tout l'écran : « le curseur a quitté la fenêtre »
+    /// n'a donc aucun sens ici. Ce qui compte est de savoir si une autre
+    /// fenêtre s'est glissée au-dessus de nous à cet endroit — c'est elle
+    /// qui doit recevoir le glissement.
+    ///
+    /// La requête reste valable pendant une capture de souris : elle est
+    /// géométrique, elle ne dépend pas de qui reçoit les événements.
+    /// </summary>
+    internal static IntPtr SousCurseur()
+    {
+        if (!GetCursorPos(out POINT ou)) return IntPtr.Zero;
+
+        IntPtr fenetre = WindowFromPoint(ou);
+
+        return fenetre == IntPtr.Zero ? IntPtr.Zero : GetAncestor(fenetre, Racine);
+    }
+
     /// <summary>
     /// La zone de travail de l'écran principal : l'écran moins la barre
     /// des tâches.

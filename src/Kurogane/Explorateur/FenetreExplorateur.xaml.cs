@@ -200,7 +200,14 @@ public partial class FenetreExplorateur : Window
         SourceInitialized += (_, _) =>
         {
             if (PresentationSource.FromVisual(this) is HwndSource source)
+            {
                 source.AddHook(MaximisationNative.Filtrer);
+
+                // Même filet que pour la couche bureau : lancé avec des
+                // droits d'administrateur, l'explorateur ne recevrait
+                // aucun dépôt venu de l'Explorateur de Windows.
+                BureauNative.AutoriserDepots(source.Handle);
+            }
         };
 
         _visibilite = new Visibilite(
@@ -293,6 +300,23 @@ public partial class FenetreExplorateur : Window
                 DispatcherPriority.Input);
             PlusOptions();
         };
+
+        // Destination d'un glissement. Comme sur le bureau, la liste
+        // couvre la fenêtre : sans AllowDrop sur elle, le dépôt serait
+        // refusé avant d'atteindre la fenêtre.
+        AllowDrop = true;
+        Cartes.AllowDrop = true;
+
+        foreach (UIElement accueil in new UIElement[] { this, Cartes })
+        {
+            accueil.DragOver += (_, e) =>
+            {
+                e.Effects = Depot.Effet(e, Destination(e.OriginalSource));
+                e.Handled = true;
+            };
+
+            accueil.Drop += async (_, e) => await Recevoir(e);
+        }
 
         MenuSupprimer.Click += async (_, _) => await Supprimer(definitif: false);
         MenuEffacer.Click   += async (_, _) => await Supprimer(definitif: true);
@@ -527,6 +551,44 @@ public partial class FenetreExplorateur : Window
 
         _apaisement.Stop();
         _apaisement.Start();
+    }
+
+    // ------------------------------------------------------------ dépôt
+
+    /// <summary>
+    /// Où irait un dépôt lâché ici : le dossier survolé si c'en est un,
+    /// le dossier courant sinon.
+    ///
+    /// C'est ce que fait l'Explorateur, et ce que l'œil attend : une carte
+    /// de dossier sous le curseur désigne ce dossier, pas celui qu'on est
+    /// en train de regarder.
+    /// </summary>
+    private string? Destination(object origine) =>
+        Cible(origine) is { Source.EstDossier: true } dossier
+            ? dossier.Chemin
+            : Courant;
+
+    private async Task Recevoir(DragEventArgs e)
+    {
+        e.Handled = true;
+
+        if (Destination(e.OriginalSource) is not { } cible) return;
+
+        var effet = Depot.Effet(e, cible);
+        if (effet == DragDropEffects.None) return;
+
+        var venus = Depot.Retenir(Depot.Chemins(e.Data), cible);
+        if (venus.Count == 0) return;
+
+        var issue = effet == DragDropEffects.Move
+            ? FileOperationNative.Deplacer(venus, cible, Poignee)
+            : FileOperationNative.Copier(venus, cible, Poignee);
+
+        Chrono.Text = issue.Silencieux
+            ? $"{venus.Count} ÉLÉMENT(S) DÉPOSÉ(S)"
+            : $"DÉPÔT REFUSÉ // CODE {issue.Code}";
+
+        await Rafraichir();
     }
 
     // ------------------------------------------------------- visibilité
@@ -908,10 +970,21 @@ public partial class FenetreExplorateur : Window
     /// </summary>
     private const double SeuilTrace = 5;
 
+    /// <summary>La carte sous le bouton, en attente d'un éventuel glissement.</summary>
+    private CarteVue? _prise;
+    private Point _priseDepart;
+
     private void DebutLasso(object expediteur, MouseButtonEventArgs e)
     {
-        // Sur une carte : c'est la ListBox qui gère, pas nous.
-        if (Cible(e.OriginalSource) is not null) return;
+        // Sur une carte : la ListBox gère la sélection, nous le transport.
+        // Rien ne démarre ici — seulement de quoi reconnaître un
+        // glissement s'il vient.
+        if (Cible(e.OriginalSource) is { } carte)
+        {
+            _prise = carte;
+            _priseDepart = e.GetPosition(Cartes);
+            return;
+        }
 
         // Clic dans le vide : on défait la sélection, ce qu'on attend de
         // n'importe quel gestionnaire de fichiers.
@@ -928,6 +1001,39 @@ public partial class FenetreExplorateur : Window
 
     private void PendantLasso(object expediteur, MouseEventArgs e)
     {
+        if (_prise is { } tiree)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed) { _prise = null; return; }
+
+            var ou = e.GetPosition(Cartes);
+
+            if (Math.Abs(ou.X - _priseDepart.X) < SeuilTrace
+                && Math.Abs(ou.Y - _priseDepart.Y) < SeuilTrace) return;
+
+            _prise = null;
+
+            // La sélection emmène le groupe ; une carte hors sélection
+            // part seule. Même règle que sur le bureau.
+            var chemins = Choisis();
+
+            if (!chemins.Contains(tiree.Chemin, StringComparer.OrdinalIgnoreCase))
+                chemins = new List<string> { tiree.Chemin };
+
+            if (chemins.Count == 0) return;
+
+            // CF_HDROP : le format que tout Windows comprend — son
+            // Explorateur, le nôtre, et le bureau Kurogane.
+            var donnees = new DataObject(DataFormats.FileDrop, chemins.ToArray());
+
+            // Bloquant : la boucle de glissement tourne jusqu'au dépôt.
+            // Rien à rafraîchir après coup — le surveillant du dossier
+            // verra partir les fichiers si c'était un déplacement.
+            DragDrop.DoDragDrop(Cartes, donnees,
+                DragDropEffects.Copy | DragDropEffects.Move);
+
+            return;
+        }
+
         if (_ancre is not { } depart || Grille is null) return;
         if (e.LeftButton != MouseButtonState.Pressed) { Terminer(); return; }
 
@@ -1516,6 +1622,17 @@ public partial class FenetreExplorateur : Window
     /// Remonte l'arbre visuel depuis l'élément cliqué jusqu'à la carte qui
     /// le contient.
     /// </summary>
+    /// <summary>
+    /// La carte sous un élément cliqué, en remontant l'arbre.
+    ///
+    /// Tout ce qu'une souris peut toucher n'est pas un Visual. Depuis que
+    /// le nom des cartes se construit en Inlines pour souligner la
+    /// correspondance du filtre, la source d'un clic peut être un
+    /// <c>Run</c> — qui n'est pas un Visual, et que VisualTreeHelper
+    /// refuse. L'arbre logique prend alors le relais le temps d'un
+    /// maillon : le parent d'un Run est son TextBlock, qui est bien un
+    /// Visual.
+    /// </summary>
     private static CarteVue? Cible(object origine)
     {
         var noeud = origine as DependencyObject;
@@ -1525,7 +1642,9 @@ public partial class FenetreExplorateur : Window
             if (noeud is FrameworkElement element && element.DataContext is CarteVue vue)
                 return vue;
 
-            noeud = VisualTreeHelper.GetParent(noeud);
+            noeud = noeud is Visual or System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(noeud)
+                : LogicalTreeHelper.GetParent(noeud);
         }
 
         return null;

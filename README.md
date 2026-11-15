@@ -778,16 +778,63 @@ donne accès. Les fichiers à défaire sont relevés en comparant le dossier
 avant et après, et non déduits des sources — le shell renomme en cas de
 collision.
 
+### Les positions, en cellules et non en pixels
+
+Windows garde les siennes dans un format interne qu'on ne lira pas. Les
+nôtres vivent dans `%LOCALAPPDATA%\Kurogane\bureau.json` — un état
+d'utilisateur, pas une donnée du projet, qui doit survivre au déplacement
+de l'exécutable.
+
+**Ce sont des cellules de grille, pas des pixels.** Windows aligne de toute
+façon sur une grille, et une cellule survit à un changement de taille
+d'icônes ou de résolution. Une seule fonction connaît les pixels ; tout le
+reste raisonne en cellules.
+
+Trois conflits sont tranchés explicitement plutôt que laissés au hasard :
+deux chemins qui revendiquent la même place — le premier arrivé la garde ;
+une icône déposée sur une case occupée — les deux échangent, parce que
+l'utilisateur a désigné une place ; un fichier renommé — il perd la sienne
+et reprend la première libre, comme sous Windows.
+
+Un dépôt **sur un dossier** n'est plus un geste de mise en page mais une
+opération sur fichiers : le dossier accueille.
+
+### Le glissement, interne puis système
+
+Tant que le curseur reste sur le bureau, le déplacement est interne et les
+icônes suivent le curseur. Dès qu'une autre fenêtre passe dessous, elles
+reprennent leur place et la main passe à `DoDragDrop`.
+
+La bascule était nécessaire : un déplacement interne capture la souris, et
+une fenêtre qui capture ne peut rien laisser sortir. Le critère « le
+curseur a quitté la fenêtre » n'aurait rien donné — la couche couvre tout
+l'écran — il faut demander à Win32 quelle fenêtre est au-dessus de nous à
+cet endroit.
+
+L'explorateur Kurogane publie et reçoit le même `CF_HDROP`, et la règle du
+dépôt vit dans `Explorateur/Depot.cs`, partagée par les deux.
+
+### Ne pas lancer en administrateur
+
+Windows isole les privilèges d'interface : un processus en intégrité
+moyenne — l'Explorateur, par exemple — **ne peut pas déposer sur la fenêtre
+d'un processus élevé**. Les messages sont filtrés avant d'arriver : pas
+d'erreur, pas de refus visible, juste un dépôt qui n'arrive jamais.
+
+Aucun des modules de bureau ou d'explorateur n'a besoin de droits
+d'administrateur. Un terminal élevé par habitude casse silencieusement tout
+dépôt venu du reste du système. Par filet, les messages `WM_DROPFILES`,
+`WM_COPYDATA` et `WM_COPYGLOBALDATA` sont explicitement autorisés sur nos
+fenêtres — mais la vraie réponse est de ne pas élever.
+
 ### Ce qui manque
 
-Les positions au pixel et le glisser-déposer. La grille se range seule en
-colonnes ; Windows laisse poser une icône où l'on veut et retient la place.
-Ces positions seront les nôtres, celles de Windows étant dans un format
-qu'on ne lira pas.
+Le multi-écran pour le placement automatique, et le comportement de
+« Afficher le bureau ».
 
 ## État
 
-v0.69.0 — mode sombre, accent, fond d'écran, 15 icônes réparties sur trois
+v0.82.0 — mode sombre, accent, fond d'écran, 15 icônes réparties sur trois
 mécanismes (registre utilisateur, registre machine, `desktop.ini`), barre des
 tâches et menu Démarrer.
 

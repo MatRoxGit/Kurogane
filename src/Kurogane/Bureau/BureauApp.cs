@@ -82,6 +82,7 @@ public static class BureauApp
                 IntPtr couche = new WindowInteropHelper(fenetre).Handle;
 
                 BureauNative.Discretion(couche);
+                BureauNative.AutoriserDepots(couche);
                 BureauNative.Placer(couche);
 
                 // Le filtre maintient la couche au fond. Sans lui, le
@@ -96,7 +97,11 @@ public static class BureauApp
             // à la bonne taille. Même redondance que pour la barre, pour
             // la même raison — un relevé ponctuel ne vaut que l'instant
             // où il a été fait.
-            veille = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            // 400 ms et non 2 s : l'Explorateur réaffiche sa vue après
+            // certaines opérations sur le bureau, et deux secondes de
+            // battement se voient — le bureau de Windows réapparaît le
+            // temps d'un clignement.
+            veille = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
             veille.Tick += (_, _) => Surveiller(fenetre);
             veille.Start();
 

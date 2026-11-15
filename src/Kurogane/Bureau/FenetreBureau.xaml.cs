@@ -81,6 +81,28 @@ public partial class FenetreBureau : Window
 
     private List<IconeVue> _vues = new();
 
+    private readonly Dispositions _places = Dispositions.Charger();
+
+    /// <summary>
+    /// Le pas de la grille. Les cellules sont plus larges et plus hautes
+    /// que les cases pour laisser respirer : deux icônes collées se lisent
+    /// comme une seule.
+    /// </summary>
+    private double PasX => TailleCase + 12;
+    private double PasY => HauteurCase + 12;
+
+    /// <summary>
+    /// Combien de lignes tiennent dans la hauteur disponible. Sert au
+    /// placement automatique, qui remplit une colonne avant de passer à la
+    /// suivante — comme Windows.
+    /// </summary>
+    private int Lignes()
+    {
+        double hauteur = Grille.ActualHeight > 0 ? Grille.ActualHeight : ActualHeight - 140;
+
+        return Math.Max(1, (int)(hauteur / PasY));
+    }
+
     public FenetreBureau(ThemeDefinition theme)
     {
         InitializeComponent();
@@ -108,10 +130,26 @@ public partial class FenetreBureau : Window
             Menu(cible is not null);
         };
 
-        // Cliquer hors des icônes désélectionne et arme la bande.
+        // Cliquer sur une icône arme un déplacement, cliquer à côté arme
+        // la bande de sélection.
         PreviewMouseLeftButtonDown += (_, e) =>
         {
-            if (Sous(e.OriginalSource) is not null) return;
+            if (Sous(e.OriginalSource) is { } prise)
+            {
+                // Armé, pas capturé : la liste doit d'abord faire sa
+                // sélection. La capture viendra au franchissement du seuil,
+                // si franchissement il y a.
+                _saisie = prise;
+                _depuis = e.GetPosition(Grille);
+
+                // Relevée maintenant, pas au franchissement du seuil : la
+                // liste réduit une multi-sélection à l'élément cliqué dès
+                // l'appui. Windows diffère cette réduction au relâchement,
+                // justement pour qu'on puisse tirer plusieurs icônes.
+                _prises = Grille.SelectedItems.OfType<IconeVue>().ToList();
+
+                return;
+            }
 
             Grille.SelectedItem = null;
 
@@ -124,8 +162,72 @@ public partial class FenetreBureau : Window
             CaptureMouse();
         };
 
-        PreviewMouseMove += (_, e) =>
+        PreviewMouseMove += async (_, e) =>
         {
+            if (_saisie is { } tiree)
+            {
+                var ou = e.GetPosition(Grille);
+
+                // Même seuil que la bande : sans lui, un clic qui tremble
+                // déplacerait l'icône d'un pixel et consommerait le
+                // double-clic.
+                if (!_deplace
+                    && Math.Abs(ou.X - _depuis.X) < 5
+                    && Math.Abs(ou.Y - _depuis.Y) < 5) return;
+
+                if (!_deplace)
+                {
+                    _deplace = true;
+
+                    // Le groupe à déplacer se construit à partir de
+                    // l'icône saisie, et non de SelectedItems.
+                    //
+                    // La première version s'y fiait et emmenait zéro
+                    // icône : la sélection était vide au moment du
+                    // franchissement du seuil. Peu importe pourquoi — une
+                    // opération qui sait déjà ce qu'elle a attrapé n'a pas
+                    // à le redemander à l'état d'un autre contrôle. La
+                    // sélection ne sert plus qu'à étendre le geste quand
+                    // l'icône saisie en fait partie.
+                    var groupe = _prises.Contains(tiree)
+                        ? _prises
+                        : new List<IconeVue> { tiree };
+
+                    // Rendre à la liste la sélection qu'elle a défaite à
+                    // l'appui. Sans cela le groupe se déplace bien, mais
+                    // une seule icône reste allumée : le geste et son
+                    // image diraient deux choses différentes.
+                    Grille.SelectedItems.Clear();
+                    foreach (var vue in groupe) Grille.SelectedItems.Add(vue);
+
+                    _origines.Clear();
+
+                    foreach (var vue in groupe)
+                        _origines[vue] = (vue.X, vue.Y);
+
+                    CaptureMouse();
+                }
+
+                double dx = ou.X - _depuis.X;
+                double dy = ou.Y - _depuis.Y;
+
+                foreach (var (vue, origine) in _origines)
+                {
+                    vue.X = origine.X + dx;
+                    vue.Y = origine.Y + dy;
+                }
+
+                // Une autre fenêtre est passée sous le curseur : ce n'est
+                // plus un rangement, c'est un transfert. Notre déplacement
+                // interne capture la souris et ne peut rien quitter ; on
+                // rend les icônes à leur place et on passe la main au
+                // glissement du système, seul capable de traverser les
+                // fenêtres.
+                if (Ailleurs()) await Emporter();
+
+                return;
+            }
+
             if (!_arme) return;
 
             var ici = e.GetPosition(this);
@@ -148,8 +250,23 @@ public partial class FenetreBureau : Window
             Cerner(zone);
         };
 
-        PreviewMouseLeftButtonUp += (_, _) => Relacher();
-        LostMouseCapture += (_, _) => Relacher();
+        // Déposer AVANT de relâcher : rendre la capture déclenche
+        // LostMouseCapture, qui dépose à son tour. Dans cet ordre, le
+        // travail est fait une fois et le second appel ne trouve rien.
+        PreviewMouseLeftButtonUp += async (_, _) => { await Deposer(); Relacher(); };
+
+        LostMouseCapture += async (_, e) =>
+        {
+            // LostMouseCapture remonte. La liste détient la capture depuis
+            // le clic ; la lui prendre déclenche sa perte, qui arrive ici
+            // et annulait le déplacement à l'instant où il commençait —
+            // d'où un groupe rempli puis vidé dans la même ligne de code.
+            // Seule la perte de NOTRE capture nous concerne.
+            if (!ReferenceEquals(e.OriginalSource, this)) return;
+
+            Relacher();
+            await Deposer();
+        };
 
         Grille.MouseDoubleClick += (_, _) => Ouvrir();
 
@@ -201,6 +318,36 @@ public partial class FenetreBureau : Window
                 Dire($"TOUCHE NON TRAITÉE : CTRL+{e.Key}");
             }
         };
+
+        // Dépôt venu de l'extérieur — l'Explorateur de Windows, le nôtre,
+        // n'importe quelle application qui publie des fichiers.
+        AllowDrop = true;
+
+        // La grille couvre presque toute la fenêtre. Sans AllowDrop sur
+        // elle, un glissement qui la survole est refusé avant d'atteindre
+        // la fenêtre, et le dépôt n'a jamais lieu.
+        Grille.AllowDrop = true;
+
+        foreach (UIElement cible in new UIElement[] { this, Grille })
+        {
+            cible.DragEnter += (_, e) =>
+            {
+                e.Effects = Depot.Effet(e, Bureau());
+                e.Handled = true;
+
+                Dire(e.Effects == DragDropEffects.None
+                    ? "DÉPÔT REFUSÉ // PAS DE FICHIERS"
+                    : $"DÉPÔT ENTRANT // {e.Effects}");
+            };
+
+            cible.DragOver += (_, e) =>
+            {
+                e.Effects = Depot.Effet(e, Bureau());
+                e.Handled = true;
+            };
+
+            cible.Drop += async (_, e) => await Recevoir(e);
+        }
 
         Loaded += async (_, _) =>
         {
@@ -255,14 +402,110 @@ public partial class FenetreBureau : Window
         }
 
         _vues = vues;
-        Ordonner();
+        Grille.ItemsSource = _vues;
+
+        Disposer();
     }
 
     /// <summary>
-    /// Applique le tri courant sans relire le disque. Changer de critère
-    /// ne doit pas coûter une lecture : les données sont déjà là.
+    /// Donne une cellule à chaque icône : celle qu'elle avait, ou la
+    /// première libre.
+    ///
+    /// Une place enregistrée peut être revendiquée par deux chemins — un
+    /// fichier supprimé puis recréé ailleurs, un fichier déplacé à la main
+    /// hors de Kurogane. La première arrivée la garde, la seconde retombe
+    /// sur une place libre : mieux vaut une icône déplacée que deux icônes
+    /// superposées.
     /// </summary>
-    private void Ordonner()
+    private void Disposer()
+    {
+        var prises = new HashSet<(int, int)>();
+        var orphelines = new List<IconeVue>();
+
+        foreach (var vue in _vues)
+        {
+            var place = _places.Pour(vue.Chemin);
+
+            if (place is null || !prises.Add((place.Colonne, place.Ligne)))
+            {
+                orphelines.Add(vue);
+                continue;
+            }
+
+            vue.Colonne = place.Colonne;
+            vue.Ligne = place.Ligne;
+        }
+
+        int lignes = Lignes();
+        int colonne = 0, ligne = 0;
+
+        foreach (var vue in orphelines)
+        {
+            while (prises.Contains((colonne, ligne)))
+            {
+                ligne++;
+                if (ligne >= lignes) { ligne = 0; colonne++; }
+            }
+
+            vue.Colonne = colonne;
+            vue.Ligne = ligne;
+
+            prises.Add((colonne, ligne));
+            _places.Poser(vue.Chemin, colonne, ligne);
+        }
+
+        _places.Nettoyer(_vues.Select(v => v.Chemin));
+        _places.Enregistrer();
+
+        Situer();
+    }
+
+    /// <summary>
+    /// Traduit les cellules en coordonnées. C'est la seule fonction qui
+    /// connaisse les pixels : tout le reste raisonne en cellules, qui
+    /// survivent à un changement de taille d'icônes ou de résolution.
+    /// </summary>
+    private void Situer()
+    {
+        foreach (var vue in _vues)
+        {
+            vue.X = vue.Colonne * PasX;
+            vue.Y = vue.Ligne * PasY;
+        }
+    }
+
+    /// <summary>
+    /// Range tout dans l'ordre de tri courant. C'est ce que fait « Trier
+    /// par » : avec des positions libres, trier ne peut pas se contenter
+    /// de réordonner une liste — il faut reposer les icônes.
+    /// </summary>
+    private void Ranger()
+    {
+        int lignes = Lignes();
+        int colonne = 0, ligne = 0;
+
+        foreach (var vue in Ordonner())
+        {
+            vue.Colonne = colonne;
+            vue.Ligne = ligne;
+
+            _places.Poser(vue.Chemin, colonne, ligne);
+
+            ligne++;
+            if (ligne >= lignes) { ligne = 0; colonne++; }
+        }
+
+        _places.Enregistrer();
+        Situer();
+    }
+
+    /// <summary>
+    /// L'ordre de tri courant, sans relire le disque : les données sont
+    /// déjà là. Rend une séquence au lieu de l'afficher — depuis que les
+    /// positions sont libres, trier ne veut plus dire réordonner une liste
+    /// mais reposer des icônes.
+    /// </summary>
+    private IEnumerable<IconeVue> Ordonner()
     {
         // Dossiers d'abord quel que soit le critère : la convention de
         // l'Explorateur, qu'on ne change pas sans raison.
@@ -294,9 +537,7 @@ public partial class FenetreBureau : Window
 
         // Le nom départage toujours : deux fichiers de même taille ne
         // doivent pas changer de place d'un tri à l'autre.
-        Grille.ItemsSource = ordonne
-            .ThenBy(v => v.Nom, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
+        return ordonne.ThenBy(v => v.Nom, StringComparer.CurrentCultureIgnoreCase);
     }
 
     /// <summary>
@@ -313,10 +554,182 @@ public partial class FenetreBureau : Window
     private bool _arme;
     private bool _trace;
 
+    private IconeVue? _saisie;
+    private Point _depuis;
+    private bool _deplace;
+
+    /// <summary>La sélection telle qu'elle était à l'appui du bouton.</summary>
+    private List<IconeVue> _prises = new();
+
+    private readonly Dictionary<IconeVue, (double X, double Y)> _origines = new();
+
+    /// <summary>Vrai si une autre fenêtre est sous le curseur.</summary>
+    private bool Ailleurs()
+    {
+        IntPtr dessous = BureauNative.SousCurseur();
+        if (dessous == IntPtr.Zero) return false;
+
+        return dessous != new WindowInteropHelper(this).Handle;
+    }
+
+    /// <summary>
+    /// Convertit le déplacement interne en glissement système.
+    ///
+    /// Les icônes reprennent leur place : ce qui part n'est pas leur
+    /// position mais les fichiers eux-mêmes, et c'est la fenêtre
+    /// d'arrivée qui décidera du sort. Si le dépôt revient chez nous,
+    /// Recevoir ignore les chemins déjà sur le bureau.
+    /// </summary>
+    private async Task Emporter()
+    {
+        var chemins = _origines.Keys.Select(v => v.Chemin).ToArray();
+
+        _origines.Clear();
+        _deplace = false;
+        _saisie = null;
+        _prises = new List<IconeVue>();
+
+        Relacher();
+        Situer();
+
+        if (chemins.Length == 0) return;
+
+        DragDrop.DoDragDrop(Grille,
+            new DataObject(DataFormats.FileDrop, chemins),
+            DragDropEffects.Copy | DragDropEffects.Move);
+
+        // Un déplacement vers ailleurs vide le bureau de ces fichiers.
+        await Lire();
+    }
+
+    /// <summary>
+    /// Conclut un déplacement. Trois cas, et ils ne font pas la même
+    /// chose.
+    ///
+    /// <b>Sur un dossier</b> : ce n'est plus un geste de mise en page mais
+    /// une opération sur fichiers. Le dossier accueille ce qu'on lui
+    /// dépose, comme partout ailleurs dans Windows.
+    ///
+    /// <b>Sur une autre icône</b> : les deux échangent leur place. Faire
+    /// glisser l'intrus vers la case libre suivante serait plus simple,
+    /// mais l'utilisateur a désigné une place — la lui refuser au profit
+    /// d'une autre serait lui désobéir poliment.
+    ///
+    /// <b>Sur une case libre</b> : aimantation, et glissement vers la
+    /// suivante libre si plusieurs icônes convergent. Superposer deux
+    /// icônes serait permis par le Canvas, et illisible à l'écran.
+    /// </summary>
+    private async Task Deposer()
+    {
+        if (!_deplace) { _saisie = null; _prises = new List<IconeVue>(); return; }
+
+        _deplace = false;
+
+        var groupe = _origines.Keys.ToList();
+        var tiree = _saisie;
+
+        _saisie = null;
+        _prises = new List<IconeVue>();
+
+        int colonne = Math.Max(0, (int)Math.Round((tiree?.X ?? 0) / PasX));
+        int ligne = Math.Max(0, (int)Math.Round((tiree?.Y ?? 0) / PasY));
+
+        var occupant = _vues.FirstOrDefault(v =>
+            !groupe.Contains(v) && v.Colonne == colonne && v.Ligne == ligne);
+
+        // ---------------------------------------------- un dossier accueille
+        if (occupant is { Source.EstDossier: true })
+        {
+            _origines.Clear();
+
+            // Remettre les icônes sur leurs cases avant d'agir : si
+            // l'opération échoue ou que l'utilisateur l'annule, rien ne
+            // doit rester en suspens au milieu du bureau.
+            Situer();
+
+            IntPtr poignee = new WindowInteropHelper(this).Handle;
+
+            var issue = FileOperationNative.Deplacer(
+                groupe.Select(v => v.Chemin).ToList(), occupant.Chemin, poignee);
+
+            Dire(issue.Silencieux
+                ? $"{groupe.Count} ÉLÉMENT(S) VERS {occupant.Nom}"
+                : $"DÉPLACEMENT REFUSÉ // CODE {issue.Code}");
+
+            await Lire();
+            return;
+        }
+
+        // ------------------------------------------------- échange de places
+        if (occupant is not null && groupe.Count == 1)
+        {
+            var seule = groupe[0];
+
+            int ancienneColonne = seule.Colonne;
+            int ancienneLigne = seule.Ligne;
+
+            seule.Colonne = colonne;
+            seule.Ligne = ligne;
+
+            occupant.Colonne = ancienneColonne;
+            occupant.Ligne = ancienneLigne;
+
+            _places.Poser(seule.Chemin, colonne, ligne);
+            _places.Poser(occupant.Chemin, ancienneColonne, ancienneLigne);
+
+            _origines.Clear();
+            _places.Enregistrer();
+            Situer();
+
+            Dire($"{seule.Nom} ↔ {occupant.Nom}");
+            return;
+        }
+
+        // --------------------------------------------------- case par case
+        var prises = new HashSet<(int, int)>(
+            _vues.Where(v => !_origines.ContainsKey(v))
+                 .Select(v => (v.Colonne, v.Ligne)));
+
+        int lignes = Lignes();
+
+        foreach (var vue in _origines.Keys)
+        {
+            int c = Math.Max(0, (int)Math.Round(vue.X / PasX));
+            int l = Math.Max(0, (int)Math.Round(vue.Y / PasY));
+
+            while (prises.Contains((c, l)))
+            {
+                l++;
+                if (l >= lignes) { l = 0; c++; }
+            }
+
+            vue.Colonne = c;
+            vue.Ligne = l;
+
+            prises.Add((c, l));
+            _places.Poser(vue.Chemin, c, l);
+        }
+
+        int posees = _origines.Count;
+        _origines.Clear();
+
+        _places.Enregistrer();
+        Situer();
+
+        Dire($"{posees} ICÔNE(S) POSÉE(S)");
+    }
+
+    /// <summary>
+    /// Rend la capture de la souris et referme la bande.
+    ///
+    /// La première version sortait quand la bande n'était pas armée, donc
+    /// un déplacement d'icône — qui capture aussi — ne rendait jamais rien.
+    /// La fenêtre gardait la capture, et le clic suivant lui était adressé
+    /// au lieu d'aller à l'icône : plus aucun déplacement ne démarrait, et
+    /// l'icône semblait revenir à sa place alors qu'elle n'avait pas bougé.
+    /// </summary>
     private void Relacher()
     {
-        if (!_arme) return;
-
         _arme = false;
         _trace = false;
 
@@ -361,7 +774,12 @@ public partial class FenetreBureau : Window
             if (courant is ListBoxItem conteneur)
                 return conteneur.DataContext as IconeVue;
 
-            courant = VisualTreeHelper.GetParent(courant);
+            // Même précaution que dans l'explorateur : un Run n'est pas
+            // un Visual, et le gabarit du bureau pourrait en porter un
+            // jour. Le coût est nul, la panne serait identique.
+            courant = courant is Visual or System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(courant)
+                : LogicalTreeHelper.GetParent(courant);
         }
 
         return null;
@@ -422,6 +840,9 @@ public partial class FenetreBureau : Window
         TailleIcone = icone;
         TailleCase = largeur;
         HauteurCase = hauteur;
+
+        // Les cellules ne bougent pas, mais leur traduction en pixels si.
+        Situer();
     }
 
     /// <summary>Le sous-menu « Trier par » : critère et sens.</summary>
@@ -440,7 +861,7 @@ public partial class FenetreBureau : Window
             racine.Items.Add(Entree(Marquer(nom, _critere == choisi), null, () =>
             {
                 _critere = choisi;
-                Ordonner();
+                Ranger();
             }));
         }
 
@@ -449,8 +870,11 @@ public partial class FenetreBureau : Window
         racine.Items.Add(Entree(_descendant ? "CROISSANT" : "DÉCROISSANT", null, () =>
         {
             _descendant = !_descendant;
-            Ordonner();
+            Ranger();
         }));
+
+        racine.Items.Add(Trait());
+        racine.Items.Add(Entree("RANGER MAINTENANT", null, Ranger));
 
         return racine;
     }
@@ -496,6 +920,9 @@ public partial class FenetreBureau : Window
         await Lire();
     }
 
+    private static string Bureau() => Environment.GetFolderPath(
+        Environment.SpecialFolder.DesktopDirectory);
+
     /// <summary>Les chemins présents dans le bureau de l'utilisateur.</summary>
     private static HashSet<string> Photographier(string dossier)
     {
@@ -509,6 +936,65 @@ public partial class FenetreBureau : Window
         {
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
+    }
+
+    /// <summary>
+    /// Reçoit un dépôt et pose les fichiers à l'endroit lâché.
+    ///
+    /// Les nouveaux chemins sont relevés en comparant le dossier avant et
+    /// après, comme pour le collage : le shell renomme en cas de
+    /// collision, et le nom calculé ne serait pas le bon.
+    /// </summary>
+    private async Task Recevoir(DragEventArgs e)
+    {
+        e.Handled = true;
+
+        string bureau = Bureau();
+
+        var effet = Depot.Effet(e, bureau);
+        if (effet == DragDropEffects.None) return;
+
+        var venus = Depot.Retenir(Depot.Chemins(e.Data), bureau);
+        if (venus.Count == 0) return;
+
+        IntPtr poignee = new WindowInteropHelper(this).Handle;
+        var ou = e.GetPosition(Grille);
+
+        var avant = Photographier(bureau);
+
+        var issue = effet == DragDropEffects.Move
+            ? FileOperationNative.Deplacer(venus, bureau, poignee)
+            : FileOperationNative.Copier(venus, bureau, poignee);
+
+        if (!issue.Silencieux)
+        {
+            Dire($"DÉPÔT REFUSÉ // CODE {issue.Code}");
+            return;
+        }
+
+        // Poser les arrivants sous le curseur, avant de relire : Disposer
+        // respecte une place déjà enregistrée.
+        int colonne = Math.Max(0, (int)Math.Round(ou.X / PasX));
+        int ligne = Math.Max(0, (int)Math.Round(ou.Y / PasY));
+
+        var prises = new HashSet<(int, int)>(_vues.Select(v => (v.Colonne, v.Ligne)));
+        int lignes = Lignes();
+
+        foreach (string arrive in Photographier(bureau).Except(avant))
+        {
+            while (prises.Contains((colonne, ligne)))
+            {
+                ligne++;
+                if (ligne >= lignes) { ligne = 0; colonne++; }
+            }
+
+            _places.Poser(arrive, colonne, ligne);
+            prises.Add((colonne, ligne));
+        }
+
+        _places.Enregistrer();
+
+        await Lire();
     }
 
     /// <summary>
