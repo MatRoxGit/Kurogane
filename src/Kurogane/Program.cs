@@ -8,7 +8,7 @@ namespace Kurogane;
 
 internal static class Program
 {
-    private const string Version = "0.54.0";
+    private const string Version = "0.69.0";
 
     private static readonly IThemeModule[] Modules =
     {
@@ -47,6 +47,7 @@ internal static class Program
                 "probe-taskbar" => CmdProbeTaskbar(),
                 "probe-taskbar-fenetres" => CmdProbeTaskbarFenetres(),
                 "barre" => CmdBarre(args),
+                "bureau" => CmdBureau(args),
                 "explorateur" => CmdExplorateur(args),
                 "probe-chrome" => CmdProbeChrome(args),
                 "probe-contraste" => CmdProbeContraste(args),
@@ -323,6 +324,27 @@ internal static class Program
     /// Barre des tâches Kurogane. Masque celle de Windows le temps qu'elle
     /// tourne, et la rend en partant. Rien n'est écrit.
     /// </summary>
+    private static int CmdBureau(string[] args)
+    {
+        if (args.Contains("--reveiller"))
+        {
+            using var sortie = new Journal("bureau-reveil");
+            return Kurogane.Bureau.BureauApp.Reveiller(sortie);
+        }
+
+        string? chemin = Flag(args, "--theme");
+
+        if (chemin is null)
+        {
+            Console.Error.WriteLine("Usage : kurogane bureau --theme <fichier.json>");
+            Console.Error.WriteLine("        kurogane bureau --reveiller");
+            return 2;
+        }
+
+        using var journal = new Journal("bureau");
+        return Kurogane.Bureau.BureauApp.Executer(journal, ThemeDefinition.Load(chemin));
+    }
+
     private static int CmdBarre(string[] args)
     {
         string? chemin = Flag(args, "--theme");
@@ -584,7 +606,10 @@ internal static class Program
     private static int CmdProbeBureau(string[] args)
     {
         using var journal = new Journal("probe-bureau");
-        return Probe.BureauProbe.Executer(journal, args.Contains("--essai"));
+
+        return args.Contains("--menu")
+            ? Probe.BureauProbe.Menu(journal)
+            : Probe.BureauProbe.Executer(journal, args.Contains("--essai"));
     }
 
     /// <summary>
@@ -1013,13 +1038,16 @@ internal static class Program
                   lit — c'est ce second cas qui est passé inaperçu deux jours
                   durant. Lecture seule.
 
-              probe-bureau [--essai]
+              probe-bureau [--essai | --menu]
                   Relève la pile de fenêtres du bureau — Progman, WorkerW,
                   SHELLDLL_DefView, SysListView32 — et où la vue des icônes
                   se trouve réellement sur cette machine. Avec --essai, la
                   masque trois secondes puis la rétablit, pour savoir si une
                   couche Kurogane pourrait occuper le bureau. Rien n'est
                   écrit : ShowWindow ne laisse pas de trace.
+                  --menu relève d'où viennent les entrées du menu du bureau :
+                  le shell, la clé DesktopBackground\Shell, et les
+                  gestionnaires COM. Lecture seule.
 
               probe-explorateur [--essai | --ouverture [--commit]]
                   Relève qui ouvre un dossier aujourd'hui, où c'est écrit, et
@@ -1062,6 +1090,19 @@ internal static class Program
                   fichier avec son application.
                   Rien n'est créé, renommé ni supprimé. La barre d'état
                   affiche les temps de lecture et de rendu.
+
+              bureau --theme <fichier.json>
+              bureau --reveiller
+                  Occupe le bureau : la vue des icônes de Windows est
+                  endormie et la couche Kurogane prend sa place, sous toutes
+                  les fenêtres. Étape 1 — la couche n'affiche pas encore
+                  d'icônes ; elles viendront du dossier Bureau.
+                  Occupe le terminal jusqu'à Ctrl+C, qui rend le bureau de
+                  Windows. Rien n'est écrit sur le disque : ShowWindow ne
+                  laisse pas de trace, et un redémarrage de l'Explorateur
+                  rend la vue de toute façon.
+                  --reveiller rend la vue sans rien lancer, pour le cas où
+                  un processus aurait été tué avant d'avoir pu se défendre.
 
               barre --theme <fichier.json>
                   Remplace la barre des tâches de Windows par celle de

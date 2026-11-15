@@ -703,36 +703,91 @@ Le **mode de rangement automatique** du cahier des charges en relèvera plus
 encore : là, Kurogane décidera fichier par fichier sans validation
 individuelle, et chaque déplacement devra être journalisé et défaisable.
 
-## Le bureau — sondé, pas encore écrit
+## La couche bureau
 
-Le menu contextuel du bureau est celui de Windows, et le rester tant qu'on
-ne possède pas le bureau. Il appartient à une `SysListView32` logée dans un
-`SHELLDLL_DefView`, lui-même enfant d'une fenêtre d'`explorer.exe`. Le
-thématiser demanderait de se greffer dans ce processus — exclu.
+Le menu contextuel du bureau appartient à une `SysListView32` logée dans un
+`SHELLDLL_DefView`, enfant d'une fenêtre d'`explorer.exe`. Le thématiser
+demanderait de se greffer dans ce processus — exclu. La seule voie
+compatible est d'occuper le bureau.
 
-La voie compatible est d'occuper le bureau : une couche Kurogane qui dessine
-les icônes depuis le dossier Bureau, et la vue de Windows mise en sommeil.
-Trois points décidaient si elle est ouverte. `probe-bureau --essai` les a
-tranchés sur une machine Windows 11 22621 :
+`probe-bureau --essai` l'a établi avant qu'une ligne soit écrite, sur
+Windows 11 22621 : la vue vit sous `Progman` parmi 18 racines dont 17
+`WorkerW`, le masquage prend, il tient au-delà de trois secondes, et la vue
+revient intacte. `ShowWindow` n'écrit rien — il n'y a donc aucun état à
+restaurer, seulement une fenêtre à réafficher.
 
-| | Relevé |
-| --- | --- |
-| Où vit la vue | `SHELLDLL_DefView` sous `Progman`, parmi 18 racines dont 17 `WorkerW` |
-| Masquage | prend, et tient au-delà de trois secondes |
-| Retour | la vue revient intacte |
+```
+kurogane bureau --theme themes\kurogane-obsidian.json
+kurogane bureau --reveiller
+```
 
-**La couche est donc possible.** `ShowWindow` n'écrit rien et se défait
-seul : rien d'irréversible n'est en jeu.
+La couche occupe le terminal jusqu'à `Ctrl+C`. Trois filets la rendent :
+`Ctrl+C`, un gestionnaire `ProcessExit`, et `--reveiller` pour le cas où le
+processus serait tué sans pouvoir se défendre. La vue est **cherchée au
+moment de rendre**, jamais retenue au moment d'endormir : si l'Explorateur a
+redémarré entre-temps, l'ancienne poignée ne désigne plus rien.
 
-Une limite que la sonde établit au passage : le *nombre* d'icônes se lit
-sans rien injecter — `LVM_GETITEMCOUNT` ne transporte aucun pointeur — mais
-leur *texte* non, car il en faudrait un, et donc de la mémoire partagée dans
-le processus du shell. Les icônes de la couche viendront du dossier Bureau,
-pas de cette liste.
+### Une fenêtre indépendante, pas une fille de Progman
+
+La technique des moteurs de fonds d'écran animés consiste à devenir fille de
+`Progman`. Elle lie la couche au sort du shell : `explorer.exe` redémarre,
+`Progman` disparaît, et ses filles avec lui. La couche est donc une fenêtre
+indépendante, maintenue juste au-dessus de `Progman` par un filtre sur
+`WM_WINDOWPOSCHANGING` — pas `HWND_BOTTOM`, qui la ferait passer *sous* le
+peintre du fond d'écran.
+
+Elle couvre tout l'écran virtuel pour que le fond d'écran ne s'arrête pas
+net, mais son **contenu** se replie dans la zone de travail : une icône sous
+la barre des tâches serait invisible.
+
+### Deux menus d'origines différentes
+
+Le clic droit du bureau mêle deux sources, et les confondre a coûté deux
+corrections.
+
+Les entrées du **shell** — « Nouveau », « Paramètres d'affichage »,
+« Personnaliser », et ce que les tiers déclarent — viennent du bureau comme
+nœud de l'espace de noms, par `SHGetDesktopFolder` puis `CreateViewObject`.
+Le dossier `Desktop` du disque, lui, ne donne que « Nouveau », « Coller »,
+« Propriétés » : c'est ce qui avait produit un menu réduit au minimum.
+
+Les entrées de la **vue** — « Affichage », « Trier par », « Actualiser »,
+« Coller » — ne viennent d'aucune source du shell. `probe-bureau --menu` l'a
+montré en relevant les trois points d'extension possibles. Elles sont
+fournies par `CDefView`, c'est-à-dire par la vue que nous venons d'endormir,
+et elles agiraient sur une liste invisible. **Elles nous appartiennent.**
+
+Même leçon pour les raccourcis : un menu contextuel affiche un raccourci,
+il ne l'installe pas. `Ctrl+C` et `Ctrl+X` ont dû être écrits alors que
+« Copier » et « Couper » figuraient déjà au menu.
+
+### Ce que la couche sait faire
+
+Les icônes viennent du dossier Bureau de l'utilisateur **et** de celui de
+tous les utilisateurs, que Windows fusionne — n'en lire qu'un ferait
+disparaître les raccourcis installés pour la machine. Entrées cachées et
+système écartées, comme le bureau de Windows.
+
+Sélection simple, multiple et au cadre ; `Ctrl+A` ; double-clic pour ouvrir ;
+`Suppr` et `Maj+Suppr` ; copier, couper, coller ; tri par nom, taille, type
+ou date ; trois tailles d'icônes ; `F5`.
+
+`Ctrl+Z` défait ce que **Kurogane** a fait, pas ce que Windows a fait : le
+shell tient sa propre pile d'annulation, à laquelle aucune API publique ne
+donne accès. Les fichiers à défaire sont relevés en comparant le dossier
+avant et après, et non déduits des sources — le shell renomme en cas de
+collision.
+
+### Ce qui manque
+
+Les positions au pixel et le glisser-déposer. La grille se range seule en
+colonnes ; Windows laisse poser une icône où l'on veut et retient la place.
+Ces positions seront les nôtres, celles de Windows étant dans un format
+qu'on ne lira pas.
 
 ## État
 
-v0.54.0 — mode sombre, accent, fond d'écran, 15 icônes réparties sur trois
+v0.69.0 — mode sombre, accent, fond d'écran, 15 icônes réparties sur trois
 mécanismes (registre utilisateur, registre machine, `desktop.ini`), barre des
 tâches et menu Démarrer.
 
@@ -741,8 +796,9 @@ En commandes séparées : la substitution de ressources dans
 tâches de remplacement, l'habillage des fenêtres par attributs DWM, le thème
 de contraste qui atteint l'intérieur de l'Explorateur, et l'explorateur
 Kurogane — navigation, arborescence, filtrage, copier-couper-coller,
-corbeille et suppression définitive, création et renommage en place, et le
-menu complet du shell redessiné au thème.
+corbeille et suppression définitive, création et renommage en place, le
+menu complet du shell redessiné au thème, et la couche bureau qui endort la
+vue de Windows pour afficher la sienne.
 
 Le pack compte 71 icônes, en noms français, vérifiables par `probe-pack` :
 elle confronte le dossier à ce que le thème, la barre et la table des types

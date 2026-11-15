@@ -116,6 +116,104 @@ internal static class BureauProbe
         return trouves;
     }
 
+    /// <summary>
+    /// D'où viennent les entrées du menu du bureau — LECTURE SEULE.
+    ///
+    /// Le premier menu que Kurogane a affiché était pauvre : quatre
+    /// entrées là où Windows en montre une douzaine. La cause tenait à une
+    /// confusion entre le dossier « Desktop » du disque et le bureau comme
+    /// nœud de l'espace de noms. Mais corriger cela ne suffit peut-être
+    /// pas : une partie des entrées ne vient d'aucun des deux.
+    ///
+    /// Trois sources possibles, et cette sonde dit ce que chacune porte
+    /// réellement sur cette machine plutôt que de l'extrapoler d'une
+    /// documentation.
+    /// </summary>
+    internal static int Menu(Journal journal)
+    {
+        journal.Step("SOURCE 1 — LE MENU DU SHELL");
+        journal.Info("IShellFolder.CreateViewObject sur le bureau.");
+        journal.Blank();
+
+        var shell = Kurogane.Native.MenuShellNative.ConstruireBureau(IntPtr.Zero, false);
+
+        if (shell is null)
+        {
+            journal.Warn("menu indisponible");
+        }
+        else
+        {
+            using (shell)
+            {
+                var entrees = shell.Racine();
+                journal.Ok($"{entrees.Count} entrée(s)");
+
+                foreach (var entree in entrees)
+                    journal.Info(entree.Separateur
+                        ? "  ———"
+                        : $"  {entree.Libelle}"
+                          + (entree.SousMenu != IntPtr.Zero ? "  >" : "")
+                          + (entree.Actif ? "" : "  (inactive)"));
+            }
+        }
+
+        journal.Blank();
+        journal.Step("SOURCE 2 — DESKTOPBACKGROUND\\SHELL");
+        journal.Info("Les verbes déclarés en registre. C'est là que vivent");
+        journal.Info("« Paramètres d'affichage » et « Personnaliser », et");
+        journal.Info("c'est le point d'extension que les tiers utilisent.");
+        journal.Blank();
+
+        Lister(journal, @"DesktopBackground\Shell", true);
+
+        journal.Blank();
+        journal.Step("SOURCE 3 — DESKTOPBACKGROUND\\SHELLEX");
+        journal.Info("Les gestionnaires COM. Chacun ajoute ses entrées par");
+        journal.Info("code : il faudrait les instancier pour les lire.");
+        journal.Blank();
+
+        Lister(journal, @"DesktopBackground\ShellEx\ContextMenuHandlers", false);
+
+        return 0;
+    }
+
+    private static void Lister(Journal journal, string chemin, bool commandes)
+    {
+        using var cle = Registry.ClassesRoot.OpenSubKey(chemin);
+
+        if (cle is null)
+        {
+            journal.Warn($"{chemin} : absente");
+            return;
+        }
+
+        var noms = cle.GetSubKeyNames();
+        journal.Ok($"{noms.Length} entrée(s)");
+
+        foreach (string nom in noms)
+        {
+            using var sous = cle.OpenSubKey(nom);
+            if (sous is null) continue;
+
+            string libelle = sous.GetValue("MUIVerb") as string
+                          ?? sous.GetValue(null) as string
+                          ?? nom;
+
+            journal.Info($"  {nom}");
+            if (libelle != nom) journal.Info($"      libellé   {libelle}");
+
+            if (sous.GetValue("SubCommands") is string sc && sc.Length > 0)
+                journal.Info($"      sous-menu {sc}");
+
+            if (!commandes) continue;
+
+            using var commande = sous.OpenSubKey("command");
+
+            if (commande?.GetValue(null) is string ligne)
+                journal.Info($"      commande  {ligne}");
+        }
+    }
+
     /// <summary>Inventaire, et si demandé un essai de masquage réversible.</summary>
     internal static int Executer(Journal journal, bool essai)
     {

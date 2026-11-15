@@ -1,0 +1,154 @@
+<!--
+  KUROGANE // bureau — étape 1 : la couche et le sommeil
+
+  Aucune icône ici. Cette étape ne prouve qu'une chose : que Kurogane peut
+  occuper la surface du bureau, et la rendre intacte. Les icônes viendront
+  du dossier Bureau, pas de la liste de Windows — en lire le texte
+  demanderait d'injecter de la mémoire dans le processus du shell.
+
+  La couche est opaque et peint elle-même le fond d'écran du thème. Une
+  fenêtre WPF réellement transparente impose AllowsTransparency, donc le
+  rendu logiciel ; peindre l'image revient au même à l'écran sans ce coût.
+-->
+<Window x:Class="Kurogane.Bureau.FenetreBureau"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="KRG//BUREAU"
+        WindowStyle="None" ResizeMode="NoResize"
+        ShowInTaskbar="False" AllowsTransparency="False"
+        ShowActivated="False"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        Background="{DynamicResource Obsidienne}">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Theme/Palette.xaml" />
+                <ResourceDictionary Source="/Theme/Menu.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Gabarit propre, comme partout : sous un thème de
+                 contraste, celui de WPF redessinerait la sélection avec
+                 les couleurs système. -->
+            <Style x:Key="IconeBureau" TargetType="ListBoxItem">
+                <Setter Property="Margin" Value="6,4" />
+                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ListBoxItem">
+                            <Border x:Name="Coque"
+                                    Width="{Binding TailleCase,
+                                        RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                    Height="{Binding HauteurCase,
+                                        RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                    Background="Transparent"
+                                    BorderBrush="Transparent" BorderThickness="1"
+                                    Padding="4,6">
+                                <StackPanel VerticalAlignment="Center">
+                                    <Image Source="{Binding Icone}"
+                                           Width="{Binding TailleIcone,
+                                               RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                           Height="{Binding TailleIcone,
+                                               RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                           RenderOptions.BitmapScalingMode="HighQuality" />
+
+                                    <TextBlock Text="{Binding Nom}" Margin="0,8,0,0"
+                                               HorizontalAlignment="Center"
+                                               TextAlignment="Center"
+                                               TextWrapping="Wrap" MaxHeight="30"
+                                               TextTrimming="CharacterEllipsis"
+                                               Foreground="{DynamicResource TexteVif}"
+                                               FontFamily="{DynamicResource Mono}"
+                                               FontSize="10" />
+                                </StackPanel>
+                            </Border>
+
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Coque" Property="BorderBrush"
+                                            Value="{DynamicResource Soudure}" />
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="Coque" Property="Background"
+                                            Value="{DynamicResource RougeVoile}" />
+                                    <Setter TargetName="Coque" Property="BorderBrush"
+                                            Value="{DynamicResource Rouge}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <Style x:Key="Mention" TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{DynamicResource Mono}" />
+                <Setter Property="FontSize" Value="10.5" />
+                <Setter Property="Foreground" Value="{DynamicResource TexteEteint}" />
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid>
+        <!-- Le fond d'écran du thème, peint par nous. Masqué tant qu'aucune
+             image n'est déclarée : l'obsidienne de la fenêtre suffit. -->
+        <Image x:Name="Fond" Stretch="UniformToFill"
+               RenderOptions.BitmapScalingMode="HighQuality" />
+
+        <!-- Tout sauf le fond d'écran vit dans la zone de travail : le
+             papier peint couvre l'écran entier, mais une icône sous la
+             barre des tâches serait invisible. -->
+        <Grid Margin="{Binding Bordures,
+                  RelativeSource={RelativeSource AncestorType={x:Type Window}}}">
+
+        <!-- Les icônes. Disposition en colonnes puis en lignes, comme
+             Windows : un WrapPanel vertical suffit tant que les positions
+             ne sont pas tenues une à une. -->
+        <!-- FocusVisualStyle écarté : WPF dessine sinon un rectangle en
+             pointillés autour de la grille entière dès qu'elle prend le
+             clavier. La sélection se voit déjà sur les icônes. -->
+        <ListBox x:Name="Grille" FocusVisualStyle="{x:Null}"
+                 Background="Transparent" BorderThickness="0"
+                 HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                 Margin="56,56,0,56" SelectionMode="Extended"
+                 ItemContainerStyle="{StaticResource IconeBureau}"
+                 ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Vertical" />
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+        </ListBox>
+
+        <!-- Cadre d'angle : la seule marque visible de l'étape 1. Elle dit
+             que la surface est à nous, sans prétendre faire plus. -->
+        <Border Margin="24" BorderThickness="1"
+                BorderBrush="{DynamicResource RougeVoile}" />
+
+        <Canvas>
+            <Path Stroke="{DynamicResource Rouge}" StrokeThickness="2"
+                  Data="M 24,72 L 24,24 L 72,24" Canvas.Left="0" Canvas.Top="0" />
+        </Canvas>
+
+        <!-- La bande de sélection. Posée après la grille pour la
+             recouvrir, et sans fond opaque pour qu'on voie ce qu'on
+             attrape. -->
+        <Border x:Name="Bande" Visibility="Collapsed"
+                HorizontalAlignment="Left" VerticalAlignment="Top"
+                Background="{DynamicResource RougeVoile}"
+                BorderBrush="{DynamicResource Rouge}" BorderThickness="1"
+                IsHitTestVisible="False" />
+
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom"
+                    HorizontalAlignment="Left" Margin="40,0,0,34">
+            <TextBlock Style="{StaticResource Mention}" Text="KRG//BUREAU"
+                       Foreground="{DynamicResource TexteVif}" />
+            <TextBlock Style="{StaticResource Mention}" Text="  //  "
+                       Foreground="{DynamicResource Rouge}" />
+            <TextBlock x:Name="Etat" Style="{StaticResource Mention}" />
+        </StackPanel>
+
+        </Grid>
+    </Grid>
+</Window>

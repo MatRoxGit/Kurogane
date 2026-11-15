@@ -29,6 +29,7 @@ namespace Kurogane.Explorateur;
 public partial class FenetreExplorateur : Window
 {
     private readonly ThemeDefinition? _theme;
+    private readonly Icones _icones;
     private readonly ISourceNoeuds _source;
 
     /// <summary>
@@ -45,6 +46,7 @@ public partial class FenetreExplorateur : Window
     public FenetreExplorateur(ThemeDefinition? theme, ISourceNoeuds source, string depart)
     {
         _theme = theme;
+        _icones = new Icones(theme);
         _source = source;
         _simpleClic = theme?.Explorateur?.OuvertureSimpleClic ?? false;
 
@@ -595,7 +597,7 @@ public partial class FenetreExplorateur : Window
             Nom    = entree.Nom,
             Meta   = meta,
             Date   = entree.Modifie.ToString("yyyy.MM.dd"),
-            Icone  = ChargerIcone(entree),
+            Icone  = _icones.Pour(entree),
             Attenue = entree.Cachee,
         };
     }
@@ -721,10 +723,7 @@ public partial class FenetreExplorateur : Window
 
         _choixShell = null;
 
-        var menu = new ContextMenu
-        {
-            Style = (Style)FindResource("MenuKurogane"),
-        };
+        var menu = MenuShellVue.Construire(this, shell, e => _choixShell = e);
 
         // Au clavier il n'y a pas de curseur à suivre : le menu s'ancre
         // sous la carte sélectionnée, comme le fait Windows.
@@ -744,8 +743,6 @@ public partial class FenetreExplorateur : Window
                                    .PlacementMode.MousePoint;
         }
 
-        Garnir(menu.Items, shell, shell.Racine());
-
         menu.Closed += async (_, _) =>
         {
             var choisi = _choixShell;
@@ -764,71 +761,6 @@ public partial class FenetreExplorateur : Window
         };
 
         menu.IsOpen = true;
-    }
-
-    /// <summary>
-    /// Transpose les entrées lues chez le shell en entrées Kurogane.
-    ///
-    /// Les sous-menus sont garnis à l'ouverture, pas d'avance : le shell
-    /// ne les remplit qu'au moment où il croit qu'on va les déplier, et
-    /// tout déplier d'emblée coûterait à chaque clic droit ce que coûte
-    /// « Envoyer vers ».
-    /// </summary>
-    private void Garnir(ItemCollection cible, MenuShellNative shell,
-                        IReadOnlyList<EntreeShell> entrees)
-    {
-        foreach (var entree in entrees)
-        {
-            if (entree.Separateur)
-            {
-                cible.Add(new Separator
-                {
-                    Style = (Style)FindResource("SeparateurMenu"),
-                });
-
-                continue;
-            }
-
-            var element = new MenuItem
-            {
-                Style = (Style)FindResource("EntreeMenu"),
-
-                // Majuscules comme le reste de l'interface ; le souligné
-                // est doublé, sinon WPF le prend pour une touche d'accès.
-                Header = entree.Libelle.ToUpper().Replace("_", "__"),
-                InputGestureText = entree.Raccourci,
-                IsEnabled = entree.Actif,
-                IsChecked = entree.Coche,
-            };
-
-            if (entree.SousMenu != IntPtr.Zero)
-            {
-                // Marque-place : sans enfant, WPF n'affiche pas la flèche
-                // et ne déclenche jamais l'ouverture.
-                element.Items.Add(new MenuItem
-                {
-                    Style = (Style)FindResource("EntreeMenu"),
-                    Header = "…",
-                    IsEnabled = false,
-                });
-
-                element.SubmenuOpened += (expediteur, _) =>
-                {
-                    if (expediteur is not MenuItem parent) return;
-                    if (parent.Tag is true) return;
-
-                    parent.Tag = true;
-                    parent.Items.Clear();
-                    Garnir(parent.Items, shell, shell.Deplier(entree));
-                };
-            }
-            else
-            {
-                element.Click += (_, _) => _choixShell = entree;
-            }
-
-            cible.Add(element);
-        }
     }
 
     // -------------------------------------------------------------- édition
@@ -1102,7 +1034,7 @@ public partial class FenetreExplorateur : Window
             Libelle = libelle,
             Detail  = detail,
             Chemin  = chemin,
-            Icone   = Icone(icone + ".ico"),
+            Icone   = _icones.Fichier(icone + ".ico"),
         };
 
         noeud.Enfants.Add(NoeudArbre.Fictif(chemin));
@@ -1640,63 +1572,7 @@ public partial class FenetreExplorateur : Window
 
     // --------------------------------------------------------------- icônes
 
-    /// <summary>
-    /// Icône du pack Kurogane selon l'extension. Le cache rend l'opération
-    /// quasi gratuite : une vingtaine d'icônes distinctes couvrent un dossier
-    /// entier, quel que soit le nombre de fichiers.
-    /// </summary>
-    private BitmapSource? ChargerIcone(Entree entree)
-    {
-        if (_theme?.Icons is null) return null;
 
-        // Repli sur l'icône générique si celle de la famille n'a pas encore
-        // été dessinée : une case vide ne dit rien à l'utilisateur. Le
-        // manque, lui, est signalé là où il doit l'être — par probe-pack,
-        // pas par un trou dans l'affichage.
-        return Icone(TypesFichiers.Pour(entree) + ".ico")
-            ?? Icone(TypesFichiers.Generique + ".ico");
-    }
 
-    private readonly Dictionary<string, BitmapSource?> _cache = new(StringComparer.OrdinalIgnoreCase);
 
-    private BitmapSource? Icone(string fichier)
-    {
-        // Sans ce cache, un dossier de mille entrées relirait le même .ico
-        // mille fois depuis le disque.
-        if (_cache.TryGetValue(fichier, out var connue)) return connue;
-
-        BitmapSource? image = null;
-
-        try
-        {
-            string chemin = _theme!.ResolveIcon(fichier);
-
-            if (File.Exists(chemin))
-            {
-                using var flux = File.OpenRead(chemin);
-
-                var decodeur = new IconBitmapDecoder(flux,
-                    BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
-
-                int ecart = int.MaxValue;
-
-                foreach (var frame in decodeur.Frames)
-                {
-                    int d = Math.Abs(frame.PixelWidth - 32);
-                    if (d >= ecart) continue;
-
-                    ecart = d;
-                    image = frame;
-                }
-            }
-        }
-        catch
-        {
-            // Une icône illisible laisse une vignette vide, jamais une
-            // exception qui ferait tomber la fenêtre.
-        }
-
-        _cache[fichier] = image;
-        return image;
-    }
 }

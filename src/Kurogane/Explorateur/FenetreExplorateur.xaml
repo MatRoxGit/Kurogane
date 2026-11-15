@@ -31,6 +31,7 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/Theme/Palette.xaml" />
+                <ResourceDictionary Source="/Theme/Menu.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Bouton de fenêtre : plat, sans cadre. La fermeture vire au
@@ -207,115 +208,6 @@
             <!-- Menu contextuel. ContextMenu, MenuItem et Separator sont
                  trois contrôles standards de plus : sans gabarit, le thème
                  de contraste les redessine à sa façon. -->
-            <Style x:Key="SeparateurMenu" TargetType="Separator">
-                <Setter Property="Height" Value="1" />
-                <Setter Property="Margin" Value="10,5" />
-                <Setter Property="Background" Value="{DynamicResource Soudure}" />
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="Separator">
-                            <Rectangle Height="1"
-                                       Fill="{DynamicResource Soudure}" />
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
-
-            <Style x:Key="EntreeMenu" TargetType="MenuItem">
-                <Setter Property="Height" Value="30" />
-                <Setter Property="Foreground" Value="{DynamicResource TexteVif}" />
-                <Setter Property="FontFamily" Value="{DynamicResource Mono}" />
-                <Setter Property="FontSize" Value="10.5" />
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="MenuItem">
-                            <Border x:Name="Fond" Background="Transparent"
-                                    BorderBrush="Transparent"
-                                    BorderThickness="2,0,0,0" Padding="12,0,16,0">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-
-                                    <ContentPresenter Grid.Column="0"
-                                                      ContentSource="Header"
-                                                      VerticalAlignment="Center" />
-
-                                    <TextBlock Grid.Column="1" Margin="28,0,0,0"
-                                               VerticalAlignment="Center"
-                                               Text="{TemplateBinding InputGestureText}"
-                                               Foreground="{DynamicResource TexteEteint}"
-                                               FontFamily="{DynamicResource Mono}"
-                                               FontSize="9.5" />
-
-                                    <!-- Chevron des sous-menus : masqué tant
-                                         que l'entrée n'a pas d'enfants. -->
-                                    <TextBlock x:Name="Chevron" Grid.Column="2"
-                                               Margin="20,0,0,0" Text="›"
-                                               VerticalAlignment="Center"
-                                               Visibility="Collapsed"
-                                               Foreground="{DynamicResource Rouge}"
-                                               FontFamily="{DynamicResource Mono}"
-                                               FontSize="13" />
-
-                                    <!-- Le sous-menu se dessine ici, avec le
-                                         même habillage que le menu parent :
-                                         un ContextMenu ne prête pas son
-                                         gabarit à ses descendants. -->
-                                    <Popup x:Name="PART_Popup" Placement="Right"
-                                           HorizontalOffset="-6" VerticalOffset="-8"
-                                           AllowsTransparency="True" Focusable="False"
-                                           PopupAnimation="None"
-                                           IsOpen="{Binding IsSubmenuOpen,
-                                                    RelativeSource={RelativeSource TemplatedParent}}">
-                                        <Border Background="{DynamicResource Creux}"
-                                                BorderBrush="{DynamicResource Soudure}"
-                                                BorderThickness="1" Padding="0,6"
-                                                MinWidth="200">
-                                            <StackPanel IsItemsHost="True"
-                                                        KeyboardNavigation.DirectionalNavigation="Cycle" />
-                                        </Border>
-                                    </Popup>
-                                </Grid>
-                            </Border>
-
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="HasItems" Value="True">
-                                    <Setter TargetName="Chevron"
-                                            Property="Visibility" Value="Visible" />
-                                </Trigger>
-                                <Trigger Property="IsHighlighted" Value="True">
-                                    <Setter TargetName="Fond" Property="Background"
-                                            Value="{DynamicResource Surface}" />
-                                    <Setter TargetName="Fond" Property="BorderBrush"
-                                            Value="{DynamicResource Rouge}" />
-                                </Trigger>
-                                <Trigger Property="IsEnabled" Value="False">
-                                    <Setter Property="Foreground"
-                                            Value="{DynamicResource RougeEteint}" />
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
-
-            <Style x:Key="MenuKurogane" TargetType="ContextMenu">
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="ContextMenu">
-                            <Border Background="{DynamicResource Obsidienne}"
-                                    BorderBrush="{DynamicResource Rouge}"
-                                    BorderThickness="1"
-                                    Padding="0,6">
-                                <StackPanel IsItemsHost="True" />
-                            </Border>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
 
             <!-- Bouton de tri. RadioButton pour l'exclusivité mutuelle,
                  mais entièrement regabarité : le rond système reviendrait

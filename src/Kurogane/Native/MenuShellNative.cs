@@ -105,6 +105,62 @@ internal sealed class MenuShellNative : IDisposable
                            out IntPtr resultat);
     }
 
+    private static readonly Guid IdElement =
+        new("43826d1e-e718-42ee-bc55-a1e261c37bfe");   // IID_IShellItem
+
+    private static readonly Guid IdDossier =
+        new("000214E6-0000-0000-C000-000000000046");   // IID_IShellFolder
+
+    private static readonly Guid IdObjet =
+        new("3981e224-f559-11d3-8e3a-00c04f6837d5");   // BHID_SFObject
+
+    [ComImport, Guid("43826d1e-e718-42ee-bc55-a1e261c37bfe"),
+     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IShellItem
+    {
+        [PreserveSig] int BindToHandler(IntPtr contexte, ref Guid bhid,
+                                        ref Guid riid, out IntPtr objet);
+        [PreserveSig] int GetParent(out IntPtr parent);
+        [PreserveSig] int GetDisplayName(uint forme, out IntPtr nom);
+        [PreserveSig] int GetAttributes(uint masque, out uint attributs);
+        [PreserveSig] int Compare(IntPtr autre, uint indice, out int ordre);
+    }
+
+    /// <summary>
+    /// IShellFolder, déclarée jusqu'à <c>CreateViewObject</c> — la
+    /// sixième de la table virtuelle. C'est par elle qu'on obtient le menu
+    /// du FOND d'un dossier, celui qui porte « Nouveau », « Actualiser »
+    /// et « Personnaliser ». Le menu d'un élément sélectionné est un autre
+    /// objet, obtenu autrement : les confondre donnait jusqu'ici le menu
+    /// du dossier courant là où il fallait celui de son fond.
+    /// </summary>
+    [ComImport, Guid("000214E6-0000-0000-C000-000000000046"),
+     InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IShellFolder
+    {
+        [PreserveSig] int ParseDisplayName(IntPtr fenetre, IntPtr contexte,
+                                           [MarshalAs(UnmanagedType.LPWStr)] string nom,
+                                           out uint consommes, out IntPtr pidl,
+                                           ref uint attributs);
+        [PreserveSig] int EnumObjects(IntPtr fenetre, uint drapeaux, out IntPtr enumeration);
+        [PreserveSig] int BindToObject(IntPtr pidl, IntPtr contexte, ref Guid riid,
+                                       out IntPtr objet);
+        [PreserveSig] int BindToStorage(IntPtr pidl, IntPtr contexte, ref Guid riid,
+                                        out IntPtr objet);
+        [PreserveSig] int CompareIDs(IntPtr parametre, IntPtr un, IntPtr deux);
+        [PreserveSig] int CreateViewObject(IntPtr fenetre, ref Guid riid, out IntPtr objet);
+    }
+
+    [DllImport("shell32.dll", PreserveSig = false)]
+    private static extern void SHGetDesktopFolder(
+        [MarshalAs(UnmanagedType.Interface)] out IShellFolder racine);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = false)]
+    private static extern void SHCreateItemFromParsingName(
+        string chemin, IntPtr contexte,
+        [MarshalAs(UnmanagedType.LPStruct)] Guid riid,
+        [MarshalAs(UnmanagedType.Interface)] out IShellItem element);
+
     /// <summary>
     /// CMINVOKECOMMANDINFO. Tous les champs en IntPtr : la variante étendue
     /// mélange chaînes ANSI et Unicode dans une même structure, source
@@ -197,7 +253,7 @@ internal sealed class MenuShellNative : IDisposable
     // ----------------------------------------------------------- instance
 
     private readonly List<IntPtr> _pidls;
-    private readonly IShellItemArray _tableau;
+    private readonly IShellItemArray? _tableau;
     private readonly object _objet;
     private readonly IContextMenu _menu;
     private readonly IContextMenu3? _trois;
@@ -205,7 +261,7 @@ internal sealed class MenuShellNative : IDisposable
 
     private bool _libere;
 
-    private MenuShellNative(List<IntPtr> pidls, IShellItemArray tableau,
+    private MenuShellNative(List<IntPtr> pidls, IShellItemArray? tableau,
                             object objet, IContextMenu menu,
                             IContextMenu3? trois, IntPtr natif)
     {
@@ -283,6 +339,117 @@ internal sealed class MenuShellNative : IDisposable
             foreach (IntPtr pidl in pidls) Marshal.FreeCoTaskMem(pidl);
 
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Le menu du FOND d'un dossier — « Nouveau », « Actualiser »,
+    /// « Coller », et pour le bureau « Paramètres d'affichage » et
+    /// « Personnaliser ».
+    ///
+    /// Ce n'est pas le menu du dossier vu depuis son parent, que donne
+    /// <see cref="Construire"/> : c'est celui que le shell construit pour
+    /// la vue elle-même, et il passe par <c>CreateViewObject</c>.
+    /// </summary>
+    internal static MenuShellNative? ConstruireFond(string dossier, IntPtr poignee,
+                                                    bool etendu)
+    {
+        try
+        {
+            SHCreateItemFromParsingName(dossier, IntPtr.Zero, IdElement,
+                                        out IShellItem element);
+
+            var bhid = IdObjet;
+            var iid = IdDossier;
+
+            if (element.BindToHandler(IntPtr.Zero, ref bhid, ref iid,
+                                      out IntPtr pointeur) < 0
+                || pointeur == IntPtr.Zero)
+                return null;
+
+            object brut = Marshal.GetObjectForIUnknown(pointeur);
+            Marshal.Release(pointeur);
+
+            return DepuisDossier(brut, poignee, etendu);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Le menu du BUREAU, qui n'est pas celui du dossier « Desktop ».
+    ///
+    /// Le dossier du disque donne « Nouveau », « Coller », « Propriétés ».
+    /// Le bureau est un nœud de l'espace de noms, et c'est lui qui porte
+    /// ce que l'utilisateur attend d'un clic droit sur son fond d'écran.
+    /// Les confondre donnait un menu réduit au minimum.
+    /// </summary>
+    internal static MenuShellNative? ConstruireBureau(IntPtr poignee, bool etendu)
+    {
+        try
+        {
+            SHGetDesktopFolder(out IShellFolder racine);
+            return DepuisDossier(racine, poignee, etendu);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Tire le menu de fond d'un IShellFolder et le prépare. L'objet
+    /// dossier est libéré ici : seul le menu doit survivre à l'appel.
+    /// </summary>
+    private static MenuShellNative? DepuisDossier(object brut, IntPtr poignee,
+                                                  bool etendu)
+    {
+        object? objet = null;
+        IntPtr natif = IntPtr.Zero;
+
+        try
+        {
+            if (brut is not IShellFolder racine)
+                throw new InvalidOperationException("IShellFolder");
+
+            var iidMenu = IdMenu;
+
+            if (racine.CreateViewObject(poignee, ref iidMenu,
+                                        out IntPtr pointeur) < 0
+                || pointeur == IntPtr.Zero)
+                throw new InvalidOperationException("CreateViewObject");
+
+            objet = Marshal.GetObjectForIUnknown(pointeur);
+            Marshal.Release(pointeur);
+
+            if (objet is not IContextMenu contextuel)
+                throw new InvalidOperationException("IContextMenu");
+
+            natif = CreatePopupMenu();
+            if (natif == IntPtr.Zero)
+                throw new InvalidOperationException("CreatePopupMenu");
+
+            uint drapeaux = CmfNormal | (etendu ? CmfEtendu : 0u);
+
+            if (contextuel.QueryContextMenu(natif, 0, IdPremier, IdDernier,
+                                            drapeaux) < 0)
+                throw new InvalidOperationException("QueryContextMenu");
+
+            return new MenuShellNative(new List<IntPtr>(), null, objet, contextuel,
+                                       objet as IContextMenu3, natif);
+        }
+        catch (Exception)
+        {
+            if (natif != IntPtr.Zero) DestroyMenu(natif);
+            if (objet is not null) Marshal.ReleaseComObject(objet);
+
+            return null;
+        }
+        finally
+        {
+            Marshal.ReleaseComObject(brut);
         }
     }
 
@@ -410,7 +577,8 @@ internal sealed class MenuShellNative : IDisposable
         if (_natif != IntPtr.Zero) DestroyMenu(_natif);
 
         Marshal.ReleaseComObject(_objet);
-        Marshal.ReleaseComObject(_tableau);
+
+        if (_tableau is not null) Marshal.ReleaseComObject(_tableau);
 
         foreach (IntPtr pidl in _pidls) Marshal.FreeCoTaskMem(pidl);
         _pidls.Clear();
